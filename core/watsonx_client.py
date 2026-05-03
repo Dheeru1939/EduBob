@@ -141,6 +141,60 @@ def generate(
         return "{}"
 
 
+def generate_stream(
+    prompt: str,
+    system: str = "",
+    max_tokens: int = 1000,
+    temperature: float = 0.5,
+):
+    """
+    Streaming generator over watsonx.ai output.
+
+    Yields token chunks as they arrive from the model. Designed to be
+    handed to st.write_stream() for live char-by-char rendering in the UI.
+
+    Args:
+        prompt: The user prompt
+        system: Optional system message prepended
+        max_tokens: Token limit
+        temperature: Sampling temperature
+
+    Yields:
+        str chunks (each may be one or many tokens, depending on the SDK)
+    """
+    if _model is None:
+        _init_client()
+
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+    params = {
+        GenParams.MAX_NEW_TOKENS: max_tokens,
+        GenParams.TEMPERATURE: temperature,
+        GenParams.TOP_P: 0.95,
+        GenParams.REPETITION_PENALTY: 1.1,
+    }
+
+    print(f"\n🤖 Streaming watsonx.ai (max_tokens={max_tokens}, temp={temperature})...")
+
+    total_chars = 0
+    try:
+        # ibm-watsonx-ai exposes generate_text_stream() that yields strings
+        for chunk in _model.generate_text_stream(prompt=full_prompt, params=params):
+            if chunk:
+                total_chars += len(chunk)
+                yield chunk
+        print(f"✓ Stream completed ({total_chars} chars)")
+        # Log to AI activity log if available
+        try:
+            from core.state import log_ai_activity
+            log_ai_activity("AI generation (stream)", total_chars // 4)  # rough char-to-token estimate
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"ERROR in generate_stream: {e}")
+        # Yield empty string so callers get an iterable result
+        yield ""
+
+
 def generate_json(
     prompt: str,
     system: str = "",
