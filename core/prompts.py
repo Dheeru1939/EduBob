@@ -261,10 +261,25 @@ Respond with ONLY valid JSON matching this schema:
 No prose, no markdown fences. Just the JSON."""
 
 
-ADAPTATION_PROMPT = """Analyze this learner's last topic performance and prescribe how to teach the NEXT topic. If they scored low or took long, go shallower. If they aced it, go deeper. Match `examples_flavor` to their established interests.
+ADAPTATION_PROMPT = """Analyze this learner's full learning history and prescribe how to teach the NEXT topic. Use the LEARNING PATTERNS to identify long-term tendencies, not just the last topic. Match `examples_flavor` to their established interests.
+
+ADAPTATION PRINCIPLES (apply based on patterns):
+- "Fast Learner" + high scores: go DEEPER, raise difficulty, less hand-holding
+- "Methodical" learner: keep depth but break into smaller chunks; use more examples
+- "Theory Strong, Practice Building": shallower lesson, MORE practical code examples
+- "Hands-On Learner": shallower lesson; reinforce concepts THROUGH the code challenge
+- "Building Foundations": go shallower, more encouraging tone, smaller code challenges
+- "Perfectionist": challenge with edge cases; mention "bonus" extensions in lesson
+- "Improving Rapidly": match their momentum — slightly deeper than last
+- "Hitting a Plateau": pull back to shallower; encouraging tone; revisit fundamentals
+- "First-Try Coder": deeper material; mention "stretch" goals
+- "Top Performer": consistently deeper depth; challenging tone
 
 Last topic performance:
 {performance_record}
+
+LEARNING PATTERNS (across all topics so far):
+{learning_patterns}
 
 Prior adaptation directives:
 {prior_directives}
@@ -578,30 +593,38 @@ def build_code_feedback_prompt(
 def build_adaptation_prompt(
     performance_record: Dict,
     prior_directives: List[Dict],
-    next_topic_title: str
+    next_topic_title: str,
+    learning_patterns: Dict = None,
 ) -> str:
     """
     Build prompt for generating adaptation directive.
-    
+
     Args:
         performance_record: Last topic's performance (schema 5.5)
         prior_directives: List of previous adaptation directives
         next_topic_title: Title of the upcoming topic
-    
+        learning_patterns: Output of detect_learning_patterns (multi-topic trends)
+
     Returns:
         Formatted prompt string
     """
     perf_str = json.dumps(performance_record, indent=2)
-    
+
     if prior_directives:
         directives_str = json.dumps(prior_directives, indent=2)
     else:
         directives_str = "No prior directives. This is the first adaptation."
-    
+
+    if learning_patterns and learning_patterns.get("patterns"):
+        patterns_str = json.dumps(learning_patterns, indent=2)
+    else:
+        patterns_str = "No multi-topic patterns detected yet (this is one of the first topics)."
+
     return ADAPTATION_PROMPT.format(
         performance_record=perf_str,
         prior_directives=directives_str,
-        next_topic_title=next_topic_title
+        next_topic_title=next_topic_title,
+        learning_patterns=patterns_str,
     )
 
 

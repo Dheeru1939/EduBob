@@ -5,6 +5,7 @@ Main Streamlit Entry Point
 
 import streamlit as st
 from core.state import init_session, reset_session, get_progress_summary, get_ai_failure_count
+from core.learning_patterns import detect_learning_patterns
 
 # Page configuration
 st.set_page_config(
@@ -70,6 +71,36 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Your Learning Profile (multi-topic pattern view)
+    if st.session_state.get("performance"):
+        patterns_data = detect_learning_patterns(st.session_state.performance)
+        with st.expander("🧬 Your Learning Profile", expanded=True):
+            st.caption(patterns_data["summary"])
+            stats = patterns_data["stats"]
+
+            mc1, mc2 = st.columns(2)
+            with mc1:
+                st.metric("Avg quiz", f"{stats['avg_quiz_pct']}%")
+                st.metric("Avg time", f"{stats['avg_time_seconds']}s")
+            with mc2:
+                st.metric("Avg code", f"{stats['avg_code_score']}/100")
+                st.metric("Trend", stats['recent_trend'])
+
+            if patterns_data["patterns"]:
+                st.markdown("**Detected patterns:**")
+                for p in patterns_data["patterns"]:
+                    st.markdown(
+                        f"<div style='padding:6px 10px; margin:4px 0; "
+                        f"background:linear-gradient(135deg,#E0F2FE,#DBEAFE); "
+                        f"border-left:3px solid #0066CC; border-radius:6px; font-size:13px;'>"
+                        f"{p['icon']} <strong>{p['tag']}</strong><br>"
+                        f"<span style='color:#555; font-size:12px;'>{p['evidence']}</span>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+            else:
+                st.caption("Complete more topics to reveal patterns.")
+
     # AI Activity Log
     with st.expander("🧠 AI Activity Log"):
         log = st.session_state.get("ai_activity_log", [])

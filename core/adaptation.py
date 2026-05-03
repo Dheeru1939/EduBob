@@ -8,12 +8,14 @@ from typing import Dict, List, Optional, Any
 
 from .watsonx_client import generate
 from .prompts import build_adaptation_prompt, parse_json_response
+from .learning_patterns import detect_learning_patterns
 
 
 def compute_next_directive(
     last_perf: Dict[str, Any],
     prior_directives: List[Dict[str, Any]],
-    next_topic_title: str
+    next_topic_title: str,
+    full_performance_history: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Analyze learner's last topic performance and compute adaptation directive
@@ -35,8 +37,17 @@ def compute_next_directive(
         
         Falls back to standard directive on parse failure.
     """
-    # Build the adaptation prompt
-    prompt = build_adaptation_prompt(last_perf, prior_directives, next_topic_title)
+    # Detect multi-topic learning patterns (heuristic, no LLM cost)
+    history = full_performance_history or [last_perf]
+    learning_patterns = detect_learning_patterns(history)
+
+    # Build the adaptation prompt with patterns included
+    prompt = build_adaptation_prompt(
+        performance_record=last_perf,
+        prior_directives=prior_directives,
+        next_topic_title=next_topic_title,
+        learning_patterns=learning_patterns,
+    )
     
     try:
         # Call watsonx.ai to generate adaptation directive

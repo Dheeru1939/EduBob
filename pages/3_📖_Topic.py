@@ -551,7 +551,8 @@ with tab3:
                             directive = compute_next_directive(
                                 last_perf=performance_record,
                                 prior_directives=st.session_state.adaptation_history,
-                                next_topic_title=next_topic['title']
+                                next_topic_title=next_topic['title'],
+                                full_performance_history=st.session_state.performance,
                             )
                             
                             from core.state import store_adaptation_directive
