@@ -201,7 +201,7 @@ CRITICAL TEST CASE RULES (must follow precisely):
    - RIGHT: `"expected": "Hello, Alice!"` — just the string itself.
    - For numbers: `"expected": "15"` or `"expected": 15` (both work).
    - For lists: `"expected": "[1, 2, 3]"` (the str() representation of the list).
-   - For dicts: `"expected": "{'a': 1}"` (the str() representation).
+   - For dicts: `"expected": "{{'a': 1}}"` (the str() representation; note the doubled braces because this is a format-template — the actual JSON should be the single-brace form).
 
 Topic specification:
 {topic_spec}
