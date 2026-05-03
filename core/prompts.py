@@ -47,7 +47,7 @@ Respond with ONLY valid JSON matching this schema:
 
 `is_final` MUST be `true` if you've already received 5 prior answers (this would be question 6, the cap). Otherwise set `true` only when you have enough information.
 
-No prose, no markdown fences. Just the JSON."""
+CRITICAL OUTPUT FORMAT — your VERY FIRST CHARACTER must be `{`. Your VERY LAST CHARACTER must be `}`. No preamble like "Here it is:", "Sure!", "Example:", or "```json". No trailing commentary. One single JSON object only."""
 
 
 INTEREST_PROFILE_PROMPT = """Synthesize a rich learner profile from this Q&A history. Infer intelligently — if they said "I'm a marketing manager wanting to learn data," infer age_band from any age cue, life_context as "mid_career_switcher", current_field as "marketing", interests as ["data"], motivation as "career-growth pivot to data".
@@ -68,7 +68,9 @@ Respond with ONLY valid JSON matching this schema:
   "preferred_style": "hands-on | structured | project-based"
 }}
 
-If a field truly cannot be inferred, use the first option as a safe default. No prose, no markdown fences. Just the JSON."""
+If a field truly cannot be inferred, use the first option as a safe default.
+
+CRITICAL: First character must be `{`. No preamble. No "Here it is:" or similar. Just the JSON object."""
 
 
 CURRICULUM_PROMPT = """Design a 5-topic Python curriculum SO PERSONALIZED that a peer educator would recognize the learner from the curriculum alone. Apply ALL personalization dimensions below — track_title, topic titles, summaries, and example domains must ALL visibly reflect the learner's profile.
@@ -165,7 +167,9 @@ Respond with ONLY valid JSON matching this schema:
   ]
 }}
 
-The topics array MUST contain exactly 5 entries (id 1 through 5). No prose, no markdown fences. Just the JSON."""
+The topics array MUST contain exactly 5 entries (id 1 through 5).
+
+CRITICAL: First character must be `{`. No preamble. No "Here is your curriculum:" or similar. Just the JSON object."""
 
 
 TOPIC_CONTENT_PROMPT = """Generate complete topic content for THIS specific learner. Lesson must be friendly markdown (length: 150 words for under_18, 200-400 words otherwise). Quiz: 3 multiple-choice questions, each with 4 options. Code challenge: a function-writing task with 2 test cases. Test cases must be deterministic and runnable via `exec()` in a restricted namespace (no imports, no I/O).
@@ -179,6 +183,19 @@ Tone calibration:
 - "50_plus": warm, patient, never patronizing
 
 Bridge framing for "mid_career_switcher": at least one sentence in the lesson should connect this Python concept to something they already know from their current_field (e.g., "If you've used pivot tables in Excel, dictionaries are the same idea in code").
+
+CRITICAL TEST CASE RULES (must follow precisely):
+1. Each test case input must be SOLVABLE by the simplest, most natural implementation of the prompt. Do NOT add edge cases (trailing slashes, leading/trailing whitespace, mixed case, numeric precision quirks) unless the prompt EXPLICITLY says to handle them.
+2. The `expected` value must equal EXACTLY what the natural implementation returns when given the `input`. Verify this by mentally running the function before writing the test case.
+3. If the function builds a URL by concatenating with "/", inputs must NOT have trailing slashes. The natural implementation does NOT strip them.
+4. If the function returns a string, do NOT add hidden whitespace, do NOT use unicode quotes, do NOT mix quote styles.
+5. For numeric functions, use simple integers or short floats. Avoid floating-point precision traps (no 0.1 + 0.2 type tests).
+6. The `starter_code` must be a clean function definition with `pass` as its body — exactly: `def function_name(args):\n    pass`. No multi-line `pass`. No imports.
+7. Test case `input` format: a Python expression literal. Examples:
+   - Single string: `"'hello'"`
+   - Two strings: `"'a', 'b'"` or `"('a', 'b')"`
+   - Number list: `"[1, 2, 3]"`
+   - Two ints: `"5, 10"`
 
 Topic specification:
 {topic_spec}
@@ -209,7 +226,7 @@ Respond with ONLY valid JSON matching this schema:
   }}
 }}
 
-No prose, no markdown fences. Just the JSON."""
+CRITICAL OUTPUT FORMAT — your VERY FIRST CHARACTER must be `{`. Your VERY LAST CHARACTER must be `}`. No preamble like "Here it is:", "Sure!", "Example:", or "```json". No trailing commentary. One single JSON object only."""
 
 
 CODE_FEEDBACK_PROMPT = """Review the student's Python code as a supportive but HONEST tutor. Be specific about strengths and improvements. Keep summary under 30 words.
@@ -258,7 +275,7 @@ Respond with ONLY valid JSON matching this schema:
   "improvements": ["Improvement 1", "Improvement 2"]
 }}
 
-No prose, no markdown fences. Just the JSON."""
+CRITICAL OUTPUT FORMAT — your VERY FIRST CHARACTER must be `{`. Your VERY LAST CHARACTER must be `}`. No preamble like "Here it is:", "Sure!", "Example:", or "```json". No trailing commentary. One single JSON object only."""
 
 
 ADAPTATION_PROMPT = """Analyze this learner's full learning history and prescribe how to teach the NEXT topic. Use the LEARNING PATTERNS to identify long-term tendencies, not just the last topic. Match `examples_flavor` to their established interests.
@@ -295,7 +312,7 @@ Respond with ONLY valid JSON matching this schema:
   "tone": "more_encouraging" | "standard" | "more_challenging"
 }}
 
-No prose, no markdown fences. Just the JSON."""
+CRITICAL OUTPUT FORMAT — your VERY FIRST CHARACTER must be `{`. Your VERY LAST CHARACTER must be `}`. No preamble like "Here it is:", "Sure!", "Example:", or "```json". No trailing commentary. One single JSON object only."""
 
 
 # ============================================================================
@@ -386,7 +403,7 @@ Respond with ONLY valid JSON matching this schema:
   ]
 }}
 
-No prose, no markdown fences. Just the JSON."""
+CRITICAL OUTPUT FORMAT — your VERY FIRST CHARACTER must be `{`. Your VERY LAST CHARACTER must be `}`. No preamble like "Here it is:", "Sure!", "Example:", or "```json". No trailing commentary. One single JSON object only."""
 
 
 def build_video_queries_prompt(topic_title: str, topic_summary: str, profile: dict) -> str:
@@ -510,7 +527,7 @@ Respond with ONLY valid JSON matching this schema:
   "estimated_hours": 2
 }}
 
-No prose, no markdown fences. Just the JSON."""
+CRITICAL OUTPUT FORMAT — your VERY FIRST CHARACTER must be `{`. Your VERY LAST CHARACTER must be `}`. No preamble like "Here it is:", "Sure!", "Example:", or "```json". No trailing commentary. One single JSON object only."""
 
 
 def build_capstone_prompt(profile: dict, topics: list) -> str:

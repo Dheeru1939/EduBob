@@ -5,8 +5,20 @@ Single entry point for all LLM generation calls
 
 import os
 import json
+import warnings
+import logging
 from typing import Optional
 from dotenv import load_dotenv
+
+# Silence the noisy Streamlit context warnings that fire when our code_runner
+# spawns a multiprocessing child (Windows uses spawn, which re-imports modules).
+# These warnings do not indicate any actual problem.
+warnings.filterwarnings(
+    "ignore",
+    message=".*ScriptRunContext.*",
+)
+logging.getLogger("streamlit.runtime.scriptrunner_utils.script_run_context").setLevel(logging.ERROR)
+logging.getLogger("streamlit.runtime.state.session_state_proxy").setLevel(logging.ERROR)
 
 # Load environment variables
 load_dotenv()
