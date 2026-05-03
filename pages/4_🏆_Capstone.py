@@ -27,7 +27,7 @@ if 'capstone' not in st.session_state or st.session_state.capstone is None:
         # Retry-on-failure + validate the result has required fields
         capstone = generate_json(
             prompt=prompt,
-            max_tokens=500,
+            max_tokens=400,
             temperature=0.6,
             validator=lambda r: isinstance(r, dict) and "project_title" in r and "build_steps" in r,
         )

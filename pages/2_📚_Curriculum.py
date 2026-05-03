@@ -30,12 +30,12 @@ if not st.session_state.curriculum:
         # Build curriculum prompt
         prompt = build_curriculum_prompt(st.session_state.profile)
 
-        # Call watsonx.ai with retry-on-failure + structural validation
-        # Lower max_tokens for speed; higher temp for variety across users
+        # Call watsonx.ai with retry + structural validation
+        # max_tokens 700 — 5 topics with short titles + summaries fits comfortably
         curriculum = generate_json(
             prompt=prompt,
             system="You are an expert curriculum designer creating PERSONALIZED Python learning paths. Always tailor topics to the learner's stated interests.",
-            max_tokens=800,
+            max_tokens=700,
             temperature=0.7,
             validator=lambda r: isinstance(r, dict) and "topics" in r and len(r.get("topics", [])) == 5,
         )

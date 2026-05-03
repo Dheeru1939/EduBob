@@ -25,7 +25,7 @@ except ImportError:
 WATSONX_API_KEY = os.getenv("WATSONX_API_KEY")
 WATSONX_PROJECT_ID = os.getenv("WATSONX_PROJECT_ID")
 WATSONX_URL = os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
-MODEL_ID = "meta-llama/llama-3-3-70b-instruct"
+MODEL_ID = "mistralai/mistral-small-3-1-24b-instruct-2503"
 
 # Global client instance (initialized on first use)
 _client = None
@@ -71,7 +71,7 @@ def _init_client():
 def generate(
     prompt: str,
     system: str = "",
-    max_tokens: int = 1500,
+    max_tokens: int = 1000,
     temperature: float = 0.3
 ) -> str:
     """
@@ -144,7 +144,7 @@ def generate(
 def generate_json(
     prompt: str,
     system: str = "",
-    max_tokens: int = 1200,
+    max_tokens: int = 1000,
     temperature: float = 0.3,
     validator=None,
 ) -> Optional[dict]:

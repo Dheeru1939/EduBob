@@ -53,11 +53,11 @@ if not st.session_state.current_question and current_count < MAX_QUESTIONS and n
         # Build prompt for next question
         prompt = build_onboarding_next_question_prompt(st.session_state.onboarding_qa)
         
-        # Call watsonx.ai
+        # Call watsonx.ai (questions are tiny — 200 tokens is plenty)
         response = generate(
             prompt=prompt,
             system="You are a friendly coding mentor conducting an onboarding interview.",
-            max_tokens=300,
+            max_tokens=200,
             temperature=0.5
         )
         
@@ -187,11 +187,11 @@ elif st.session_state.onboarding_complete and not st.session_state.profile:
         # Build profile generation prompt
         prompt = build_interest_profile_prompt(st.session_state.onboarding_qa)
 
-        # Call watsonx.ai with retry + validation
+        # Call watsonx.ai with retry + validation (profile is small JSON — 300 plenty)
         profile = generate_json(
             prompt=prompt,
             system="You are an educational AI analyzing learner profiles.",
-            max_tokens=400,
+            max_tokens=300,
             temperature=0.3,
             validator=lambda r: isinstance(r, dict) and "interests" in r and isinstance(r.get("interests"), list),
         )

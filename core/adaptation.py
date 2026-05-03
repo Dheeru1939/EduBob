@@ -43,7 +43,7 @@ def compute_next_directive(
         response = generate(
             prompt=prompt,
             system="You are an adaptive learning system analyzing student performance.",
-            max_tokens=300,
+            max_tokens=200,  # directive is a small JSON — 200 plenty
             temperature=0.4  # Slightly higher for more varied adaptations
         )
         

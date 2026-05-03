@@ -74,12 +74,12 @@ if current_topic_id not in st.session_state.topic_contents:
             adaptation_directive=adaptation_directive
         )
 
-        # Call watsonx.ai with retry-on-failure + schema validation
-        # max_tokens reduced to 1200 (lessons are 200-400 words; was 1500 with headroom waste)
+        # Call watsonx.ai with retry + schema validation
+        # max_tokens 1000 — lesson 200-400 words + 3 quiz Qs + challenge fits in ~700-900 tokens
         content = generate_json(
             prompt=prompt,
             system="You are an expert Python educator creating engaging, personalized learning content.",
-            max_tokens=1200,
+            max_tokens=1000,
             temperature=0.5,
             validator=lambda r: (
                 isinstance(r, dict)
@@ -324,7 +324,7 @@ with tab3:
                     feedback_response = generate(
                         prompt=feedback_prompt,
                         system="You are a supportive coding tutor providing constructive feedback.",
-                        max_tokens=500,
+                        max_tokens=400,
                         temperature=0.4
                     )
                     
