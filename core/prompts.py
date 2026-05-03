@@ -340,6 +340,48 @@ def build_curriculum_prompt(profile: Dict) -> str:
     return CURRICULUM_PROMPT.format(profile=profile_str)
 
 
+LESSON_MODE_PROMPT = """You are a Python tutor re-explaining a concept the learner has already seen, in a different style. Keep it CONCISE (under 250 words). Output as friendly markdown.
+
+The learner already read the standard explanation below. Now re-explain the SAME concept but in the requested STYLE. Do not repeat the standard lesson.
+
+STANDARD LESSON they just read (for reference — do NOT repeat it):
+{lesson_markdown}
+
+LEARNER PROFILE:
+{profile}
+
+REQUESTED STYLE: {mode}
+
+STYLE GUIDES (apply the one matching `mode`):
+
+- "real_example": A short, concrete walkthrough using ONE realistic scenario from the learner's `current_field`. Show the data they would actually see, the steps, and the Python code that would handle it. Make it feel like solving a real problem in their job/life.
+
+- "code_walkthrough": A focused code snippet (10-20 lines max) that demonstrates the concept, with INLINE comments explaining each line. Then 2-3 bullet points highlighting the key takeaways. Code first, prose second.
+
+- "analogy": Explain the concept through a vivid everyday-life analogy (cooking, sports, organizing a closet, anything relatable). Then ONE short paragraph mapping the analogy back to Python. End with a single tiny code snippet (3-5 lines max) that shows the Python version of the analogy.
+
+Output ONLY the explanation as markdown. No preamble like "Sure, here is..." — just the content."""
+
+
+def build_lesson_mode_prompt(topic_title: str, lesson_markdown: str, profile: dict, mode: str) -> str:
+    """Build prompt for an alternative-style lesson explanation.
+
+    Args:
+        topic_title: Topic name
+        lesson_markdown: The original standard lesson
+        profile: Learner profile dict
+        mode: One of "real_example", "code_walkthrough", "analogy"
+    """
+    profile_str = json.dumps(profile, indent=2)
+    # Trim lesson to keep prompt small
+    trimmed_lesson = lesson_markdown[:800]
+    return LESSON_MODE_PROMPT.format(
+        lesson_markdown=trimmed_lesson,
+        profile=profile_str,
+        mode=mode,
+    )
+
+
 TOPIC_CHAT_PROMPT = """You are a friendly Python tutor named Watsonx, helping a learner who is currently studying this specific topic. Answer their question conversationally and concisely (under 200 words). Use Python examples where helpful. Reference their personal interests when natural.
 
 If they ask about something unrelated to the current topic or to Python at all, gently redirect them back to the topic.

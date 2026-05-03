@@ -19,8 +19,11 @@ from core.prompts import (
     build_topic_content_prompt,
     build_code_feedback_prompt,
     build_topic_chat_prompt,
+    build_lesson_mode_prompt,
     parse_json_response
 )
+import streamlit.components.v1 as components
+import json as _json
 from core.code_runner import run_code_with_tests
 from core.adaptation import compute_next_directive
 
@@ -143,19 +146,114 @@ if f'chat_history_{current_topic_id}' not in st.session_state:
 tab1, tab2, tab3, tab4 = st.tabs(["📚 Lesson", "❓ Quiz", "💻 Challenge", "💬 Ask Watsonx"])
 
 # ============================================================================
-# TAB 1: LESSON
+# TAB 1: LESSON (with multi-mode explanations + voice narration)
 # ============================================================================
 with tab1:
-    # Stream lesson on first reveal for visual effect
-    if not st.session_state.get(f'lesson_revealed_{current_topic_id}', False):
-        lesson_text = topic_content['lesson_markdown']
-        st.write_stream((char for char in lesson_text))
-        st.session_state[f'lesson_revealed_{current_topic_id}'] = True
+    # ---------- Mode selector: Standard / Example / Walkthrough / Analogy ----------
+    mode_label_to_key = {
+        "📖 Standard": "standard",
+        "🌍 Real Example": "real_example",
+        "🔍 Code Walkthrough": "code_walkthrough",
+        "🎯 Analogy": "analogy",
+    }
+    selected_label = st.radio(
+        "How would you like this explained?",
+        options=list(mode_label_to_key.keys()),
+        horizontal=True,
+        key=f"lesson_mode_{current_topic_id}",
+        help="Standard = the original lesson. Other modes re-explain the same concept differently — generated on demand by Watsonx.",
+    )
+    selected_mode = mode_label_to_key[selected_label]
+
+    # Cache lazy-loaded modes per topic
+    if f'lesson_modes_{current_topic_id}' not in st.session_state:
+        st.session_state[f'lesson_modes_{current_topic_id}'] = {}
+    modes_cache = st.session_state[f'lesson_modes_{current_topic_id}']
+
+    if selected_mode == "standard":
+        # Stream lesson on first reveal for visual effect
+        if not st.session_state.get(f'lesson_revealed_{current_topic_id}', False):
+            lesson_text = topic_content['lesson_markdown']
+            st.write_stream((char for char in lesson_text))
+            st.session_state[f'lesson_revealed_{current_topic_id}'] = True
+        else:
+            st.markdown(topic_content['lesson_markdown'])
+        current_lesson_text = topic_content['lesson_markdown']
     else:
-        st.markdown(topic_content['lesson_markdown'])
-    
+        # Lazy-load alternative mode
+        if selected_mode not in modes_cache:
+            with st.spinner(f"Watsonx is preparing the {selected_label.split(' ', 1)[1].lower()} version..."):
+                alt_prompt = build_lesson_mode_prompt(
+                    topic_title=current_topic['title'],
+                    lesson_markdown=topic_content['lesson_markdown'],
+                    profile=st.session_state.profile,
+                    mode=selected_mode,
+                )
+                alt_text = generate(
+                    prompt=alt_prompt,
+                    max_tokens=400,
+                    temperature=0.6,
+                )
+                if not alt_text or alt_text == "{}":
+                    alt_text = "_(Watsonx had trouble generating this version. Try Standard or another mode.)_"
+                modes_cache[selected_mode] = alt_text
+                st.session_state[f'lesson_modes_{current_topic_id}'] = modes_cache
+        st.markdown(modes_cache[selected_mode])
+        current_lesson_text = modes_cache[selected_mode]
+
+    # ---------- Voice narration (browser TTS, zero LLM cost) ----------
+    st.markdown("")
+    # Strip markdown markers so TTS sounds clean
+    import re as _re
+    speakable = _re.sub(r'[#*`_~\[\]()>]', '', current_lesson_text)
+    speakable_js = _json.dumps(speakable)  # safely JSON-escape for JS string
+
+    components.html(f"""
+    <div style="display:flex; gap:8px; align-items:center;">
+        <button onclick="edubobSpeak()" style="
+            background: linear-gradient(135deg, #0066CC, #00A3E0);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        ">🔊 Listen to this lesson</button>
+        <button onclick="edubobStop()" style="
+            background: #EF4444;
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        ">⏸ Stop</button>
+        <span id="edubob_status" style="font-size:13px; color:#666; margin-left:8px;"></span>
+    </div>
+    <script>
+        const lessonText_{current_topic_id}_{selected_mode} = {speakable_js};
+        function edubobSpeak() {{
+            window.speechSynthesis.cancel();
+            const utt = new SpeechSynthesisUtterance(lessonText_{current_topic_id}_{selected_mode});
+            utt.rate = 1.0;
+            utt.pitch = 1.0;
+            utt.volume = 1.0;
+            utt.onstart = () => document.getElementById('edubob_status').textContent = '🔊 Speaking...';
+            utt.onend = () => document.getElementById('edubob_status').textContent = '✓ Done';
+            utt.onerror = () => document.getElementById('edubob_status').textContent = '⚠ Speech failed';
+            window.speechSynthesis.speak(utt);
+        }}
+        function edubobStop() {{
+            window.speechSynthesis.cancel();
+            document.getElementById('edubob_status').textContent = '⏹ Stopped';
+        }}
+    </script>
+    """, height=55)
+
     st.markdown("---")
-    
+
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("Take Quiz →", type="primary", use_container_width=True):
