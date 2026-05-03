@@ -285,6 +285,23 @@ with tab3:
                 
                 if test_results.get('error') and not test_results['results']:
                     st.error(f"❌ Execution Error: {test_results['error']}")
+
+                    # Try to extract line number from the error and highlight it
+                    import re
+                    line_match = re.search(r'line\s+(\d+)', test_results['error'])
+                    if line_match:
+                        bad_line_num = int(line_match.group(1))
+                        code_lines = code.split('\n')
+                        if 0 < bad_line_num <= len(code_lines):
+                            bad_line_text = code_lines[bad_line_num - 1]
+                            st.markdown(f"**Look at line {bad_line_num} of your code:**")
+                            st.code(f"  {bad_line_text}", language="python")
+                            # Common gotcha hint
+                            if 'passdef' in bad_line_text or 'passimport' in bad_line_text or 'passreturn' in bad_line_text:
+                                st.info(
+                                    "💡 Hint: It looks like the starter `pass` and your new code got merged onto the same line. "
+                                    "Add a newline between them, or delete `pass` entirely before writing your function body."
+                                )
                 else:
                     # Show each test result
                     for result in test_results['results']:

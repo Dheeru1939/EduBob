@@ -212,7 +212,33 @@ Respond with ONLY valid JSON matching this schema:
 No prose, no markdown fences. Just the JSON."""
 
 
-CODE_FEEDBACK_PROMPT = """Review the student's Python code as a supportive tutor. Score 0-100. Verdict: 'passed', 'passed_with_notes', or 'failed'. Be specific about strengths and improvements. Keep summary under 30 words.
+CODE_FEEDBACK_PROMPT = """Review the student's Python code as a supportive but HONEST tutor. Be specific about strengths and improvements. Keep summary under 30 words.
+
+SCORING RULES (apply STRICTLY based on test_results — do not score generously):
+
+1. If test_results shows an "error" field with "SyntaxError", "IndentationError", "NameError" before any test ran:
+   - Score: 0-15
+   - Verdict: "failed"
+   - Reason: code did not execute. Strengths can include intent/approach if visible, but be clear the code cannot run.
+
+2. If 0 tests passed AND code executed (returned wrong values, runtime error mid-execution):
+   - Score: 15-35
+   - Verdict: "failed"
+   - Mention what went wrong specifically.
+
+3. If SOME tests passed but not all (partial success):
+   - Score: 40-70 (more passes = higher score within this band)
+   - Verdict: "passed_with_notes"
+   - Highlight what's working and what edge case is missed.
+
+4. If ALL tests passed:
+   - Score: 80-100
+   - Verdict: "passed"
+   - Score 90+ if code is also clean/idiomatic; 80-89 if it works but has style issues.
+
+NEVER score above 35 if test_results.passed == 0. NEVER score 80+ unless every test passed.
+
+Look at the test_results FIRST before forming your score. Match the score to the actual execution outcome, not the apparent effort.
 
 Challenge prompt:
 {challenge_prompt}
