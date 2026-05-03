@@ -20,10 +20,12 @@ from core.prompts import (
     build_code_feedback_prompt,
     build_topic_chat_prompt,
     build_lesson_mode_prompt,
+    build_video_queries_prompt,
     parse_json_response
 )
 import streamlit.components.v1 as components
 import json as _json
+import urllib.parse as _urlparse
 from core.code_runner import run_code_with_tests
 from core.adaptation import compute_next_directive
 
@@ -251,6 +253,49 @@ with tab1:
         }}
     </script>
     """, height=55)
+
+    st.markdown("---")
+
+    # ---------- AI-curated video tutorials (lazy-loaded) ----------
+    st.markdown("### 🎥 Watch related videos")
+    st.caption("Watsonx picked these YouTube searches based on your topic and profile.")
+
+    video_cache_key = f'video_queries_{current_topic_id}'
+    if video_cache_key not in st.session_state:
+        if st.button("Generate video recommendations", key=f"gen_videos_{current_topic_id}"):
+            with st.spinner("Watsonx is finding the best tutorial searches for you..."):
+                vq_prompt = build_video_queries_prompt(
+                    topic_title=current_topic['title'],
+                    topic_summary=current_topic.get('summary', ''),
+                    profile=st.session_state.profile,
+                )
+                vq_result = generate_json(
+                    prompt=vq_prompt,
+                    max_tokens=300,
+                    temperature=0.5,
+                    validator=lambda r: isinstance(r, dict) and isinstance(r.get("queries"), list) and len(r["queries"]) >= 1,
+                )
+                if vq_result:
+                    st.session_state[video_cache_key] = vq_result["queries"][:3]
+                else:
+                    # Fallback: 1 generic query so the button is never empty
+                    st.session_state[video_cache_key] = [
+                        {"label": f"📺 {current_topic['title']} tutorial", "query": f"python {current_topic['title']} tutorial for beginners"}
+                    ]
+                st.rerun()
+    else:
+        # Render the cached queries as link buttons
+        queries = st.session_state[video_cache_key]
+        cols = st.columns(len(queries))
+        for col, q in zip(cols, queries):
+            with col:
+                yt_url = f"https://www.youtube.com/results?search_query={_urlparse.quote(q['query'])}"
+                st.link_button(q['label'], yt_url, use_container_width=True)
+                st.caption(f"_{q['query']}_")
+        # Allow regen
+        if st.button("🔄 Regenerate video picks", key=f"regen_videos_{current_topic_id}"):
+            del st.session_state[video_cache_key]
+            st.rerun()
 
     st.markdown("---")
 

@@ -340,6 +340,50 @@ def build_curriculum_prompt(profile: Dict) -> str:
     return CURRICULUM_PROMPT.format(profile=profile_str)
 
 
+VIDEO_QUERIES_PROMPT = """You are recommending YouTube tutorial searches for a learner currently studying a Python topic. Generate 3 highly-targeted search queries that would surface high-quality tutorials matching this learner's level and interests.
+
+Each query should be:
+- Short (5-9 words)
+- Specific to the concept (not generic "Python tutorial")
+- Calibrated to the learner's skill_level
+- Where natural, reflect the learner's current_field or interest area
+- Use phrasing real learners actually search for
+
+EXAMPLES of good vs bad queries for "Lists" topic:
+- BAD: "python tutorial" (too generic)
+- BAD: "advanced list comprehensions deep dive" (wrong level for absolute beginner)
+- GOOD for marketing-pivot beginner: "python lists for spreadsheet users beginner"
+- GOOD for game-curious teen: "python lists tutorial for game developers"
+- GOOD for retired explorer: "python lists explained simply for beginners"
+
+CURRENT TOPIC: {topic_title}
+TOPIC SUMMARY: {topic_summary}
+
+LEARNER PROFILE:
+{profile}
+
+Respond with ONLY valid JSON matching this schema:
+{{
+  "queries": [
+    {{"label": "Short button label (4-6 words, friendly)", "query": "actual youtube search query"}},
+    {{"label": "Another button label", "query": "another youtube search query"}},
+    {{"label": "Third button label", "query": "third youtube search query"}}
+  ]
+}}
+
+No prose, no markdown fences. Just the JSON."""
+
+
+def build_video_queries_prompt(topic_title: str, topic_summary: str, profile: dict) -> str:
+    """Build prompt for AI-generated YouTube tutorial search queries."""
+    profile_str = json.dumps(profile, indent=2)
+    return VIDEO_QUERIES_PROMPT.format(
+        topic_title=topic_title,
+        topic_summary=topic_summary,
+        profile=profile_str,
+    )
+
+
 LESSON_MODE_PROMPT = """You are a Python tutor re-explaining a concept the learner has already seen, in a different style. Keep it CONCISE (under 250 words). Output as friendly markdown.
 
 The learner already read the standard explanation below. Now re-explain the SAME concept but in the requested STYLE. Do not repeat the standard lesson.
