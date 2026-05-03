@@ -70,8 +70,14 @@ if current_topic_id not in st.session_state.topic_contents:
     st.info("✨ Generating personalized content for this topic...")
     
     with st.spinner("🤖 Watsonx is preparing your lesson, quiz, and challenge..."):
-        # Get adaptation directive if exists
-        adaptation_directive = get_adaptation_directive(current_topic_id)
+        # Forced directive (set when user requests a regeneration after failing) takes precedence
+        forced_directive = st.session_state.get(f'forced_directive_{current_topic_id}')
+        if forced_directive:
+            adaptation_directive = forced_directive
+            # Consume the forced directive so it only applies once per regeneration
+            del st.session_state[f'forced_directive_{current_topic_id}']
+        else:
+            adaptation_directive = get_adaptation_directive(current_topic_id)
 
         # Build prompt
         prompt = build_topic_content_prompt(
@@ -140,17 +146,70 @@ if adaptation_directive:
     </div>
     """, unsafe_allow_html=True)
 
-# Initialize per-topic chat history
+# Initialize per-topic chat history (shown inline on the Lesson tab)
 if f'chat_history_{current_topic_id}' not in st.session_state:
     st.session_state[f'chat_history_{current_topic_id}'] = []
 
-# Four tabs (Lesson, Quiz, Challenge, Ask Watsonx)
-tab1, tab2, tab3, tab4 = st.tabs(["📚 Lesson", "❓ Quiz", "💻 Challenge", "💬 Ask Watsonx"])
+# Initialize regeneration counter (caps to prevent infinite re-asks)
+if f'regen_count_{current_topic_id}' not in st.session_state:
+    st.session_state[f'regen_count_{current_topic_id}'] = 0
+MAX_REGENERATIONS = 2
+
+
+def _request_topic_regeneration(reason_tag: str):
+    """Clear cached topic content + force a shallower/encouraging directive, then rerun."""
+    forced = {
+        "depth": "shallower",
+        "examples_flavor": (st.session_state.profile.get("interests", ["general"]) or ["general"])[0],
+        "extra_emphasis": "fundamentals — explain what this concept actually does in plain English first, then show it",
+        "tone": "more_encouraging",
+    }
+    st.session_state[f'forced_directive_{current_topic_id}'] = forced
+    # Clear all caches related to this topic
+    for k in [
+        f'topic_contents',  # we'll handle differently below
+    ]:
+        pass
+    if current_topic_id in st.session_state.get('topic_contents', {}):
+        del st.session_state['topic_contents'][current_topic_id]
+    for key_prefix in [
+        f'lesson_modes_', f'lesson_revealed_', f'quiz_submitted_',
+        f'quiz_score_', f'video_queries_',
+    ]:
+        full_key = f'{key_prefix}{current_topic_id}'
+        if full_key in st.session_state:
+            del st.session_state[full_key]
+    st.session_state[f'regen_count_{current_topic_id}'] = (
+        st.session_state.get(f'regen_count_{current_topic_id}', 0) + 1
+    )
+    st.session_state[f'last_regen_reason_{current_topic_id}'] = reason_tag
+    st.rerun()
+
+
+# Three tabs (Lesson, Quiz, Challenge). Chat lives inside Lesson tab now.
+tab1, tab2, tab3 = st.tabs(["📚 Lesson", "❓ Quiz", "💻 Challenge"])
 
 # ============================================================================
 # TAB 1: LESSON (with multi-mode explanations + voice narration)
 # ============================================================================
 with tab1:
+    # ---------- Regeneration banner (shown right after a refresh-on-fail) ----------
+    last_reason = st.session_state.get(f'last_regen_reason_{current_topic_id}')
+    if last_reason:
+        if last_reason == "quiz_fail":
+            st.success(
+                "🔄 **Lesson refreshed for you.** Watsonx noticed you missed some quiz questions, "
+                "so this version is shallower, more encouraging, and grounded in fundamentals. Take your time — "
+                "and use the chat below if anything still feels unclear."
+            )
+        elif last_reason == "code_fail":
+            st.success(
+                "🔄 **Lesson refreshed for you.** Watsonx noticed the code challenge was tough, "
+                "so this version focuses on the building blocks first. Re-read it, then head back to the challenge."
+            )
+        # Show the banner only once per regeneration
+        del st.session_state[f'last_regen_reason_{current_topic_id}']
+
     # ---------- Mode selector: Standard / Example / Walkthrough / Analogy ----------
     mode_label_to_key = {
         "📖 Standard": "standard",
@@ -299,6 +358,65 @@ with tab1:
 
     st.markdown("---")
 
+    # ---------- 💬 Ask Watsonx (lives inside the Lesson tab; not on Quiz/Challenge) ----------
+    chat_key = f'chat_history_{current_topic_id}'
+    chat_history = st.session_state[chat_key]
+
+    with st.expander("💬 Ask Watsonx anything about this topic", expanded=bool(chat_history)):
+        st.caption("Confused or curious? Watsonx has the lesson loaded.")
+
+        # Quick-prompt buttons
+        quick_cols = st.columns(3)
+        quick_prompts = [
+            ("🧒 ELI5", "Explain this topic to me like I'm 5 years old."),
+            ("🌍 Real example", "Give me a real-world example using something from my field."),
+            ("⚠️ Common mistake", "What's the most common mistake beginners make with this concept?"),
+        ]
+        pending_question = None
+        for col, (label, prompt) in zip(quick_cols, quick_prompts):
+            with col:
+                if st.button(label, key=f"quick_{label}_{current_topic_id}", use_container_width=True):
+                    pending_question = prompt
+
+        # Render existing chat history
+        if chat_history:
+            st.markdown("---")
+        for msg in chat_history:
+            with st.chat_message(msg['role']):
+                st.markdown(msg['content'])
+
+        # Free-form input
+        typed_question = st.chat_input("Type your question...", key=f"chat_input_{current_topic_id}")
+        user_question = pending_question or typed_question
+
+        if user_question:
+            chat_history.append({"role": "user", "content": user_question})
+            with st.chat_message("user"):
+                st.markdown(user_question)
+            with st.chat_message("assistant"):
+                with st.spinner("Watsonx is thinking..."):
+                    chat_prompt = build_topic_chat_prompt(
+                        topic_title=current_topic['title'],
+                        lesson_markdown=topic_content.get('lesson_markdown', ''),
+                        profile=st.session_state.profile,
+                        chat_history=chat_history[:-1],
+                        user_question=user_question,
+                    )
+                    answer = generate(prompt=chat_prompt, max_tokens=350, temperature=0.5)
+                    if not answer or answer == "{}":
+                        answer = "Hmm, I'm having trouble responding right now. Try rephrasing, or check the AI Activity Log in the sidebar."
+                    st.markdown(answer)
+            chat_history.append({"role": "assistant", "content": answer})
+            st.session_state[chat_key] = chat_history
+            st.rerun()
+
+        if chat_history:
+            if st.button("🗑️ Clear chat", key=f"clear_chat_{current_topic_id}"):
+                st.session_state[chat_key] = []
+                st.rerun()
+
+    st.markdown("---")
+
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("Take Quiz →", type="primary", use_container_width=True, key=f"goto_quiz_{current_topic_id}"):
@@ -360,8 +478,8 @@ with tab2:
         elif percentage >= 67:
             st.success(f"✅ Good job! {score}/{total} correct!")
         else:
-            st.warning(f"📝 You got {score}/{total} correct. Review the lesson and try the challenge!")
-        
+            st.warning(f"📝 You got {score}/{total} correct. Don't worry — let's reinforce these concepts.")
+
         # Show correct answers
         with st.expander("📋 Review Answers"):
             for i, question in enumerate(quiz):
@@ -370,9 +488,34 @@ with tab2:
                 st.markdown(f"**Q{i+1}:** {question['question']}")
                 st.markdown(f"✅ **Correct answer:** {correct_answer}")
                 st.markdown("")
-        
+
+        # ---------- Fail handling: offer to regenerate topic if score is low ----------
+        regen_count = st.session_state.get(f'regen_count_{current_topic_id}', 0)
+        if percentage < 67 and regen_count < MAX_REGENERATIONS:
+            st.markdown("---")
+            st.info(
+                "🤔 **Want Watsonx to re-explain this topic differently?** "
+                "It will rewrite the lesson with a shallower depth, more encouraging tone, "
+                "and clearer fundamentals — tailored to where you struggled."
+            )
+            cregen1, cregen2 = st.columns(2)
+            with cregen1:
+                if st.button("🔄 Yes — regenerate this topic", type="primary",
+                             key=f"regen_after_quiz_{current_topic_id}", use_container_width=True):
+                    _request_topic_regeneration("quiz_fail")
+            with cregen2:
+                if st.button("👉 No thanks — try the challenge anyway",
+                             key=f"skip_regen_after_quiz_{current_topic_id}", use_container_width=True):
+                    pass  # falls through to Continue button below
+        elif percentage < 67 and regen_count >= MAX_REGENERATIONS:
+            st.markdown("---")
+            st.info(
+                "💡 You've already regenerated this topic. Try the challenge or use the chat on the "
+                "Lesson tab to ask Watsonx anything specific."
+            )
+
         st.markdown("---")
-        
+
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button("Continue to Challenge →", type="primary", use_container_width=True, key=f"goto_challenge_{current_topic_id}"):
@@ -525,7 +668,34 @@ with tab3:
                     st.markdown("**🎯 Improvements:**")
                     for improvement in feedback.get('improvements', []):
                         st.markdown(f"- {improvement}")
-                
+
+                # ---------- Fail handling: offer regenerate when challenge didn't pass ----------
+                if passed != total:
+                    regen_count = st.session_state.get(f'regen_count_{current_topic_id}', 0)
+                    st.markdown("---")
+                    if regen_count < MAX_REGENERATIONS:
+                        st.info(
+                            "🤔 **The challenge didn't pass yet.** Watsonx can regenerate the lesson "
+                            "with a shallower depth and a gentler challenge — then come back here and try again."
+                        )
+                        cregen1, cregen2 = st.columns(2)
+                        with cregen1:
+                            if st.button("🔄 Regenerate the topic for me",
+                                         type="primary",
+                                         key=f"regen_after_code_{current_topic_id}",
+                                         use_container_width=True):
+                                _request_topic_regeneration("code_fail")
+                        with cregen2:
+                            if st.button("👉 Let me try again as-is",
+                                         key=f"retry_code_{current_topic_id}",
+                                         use_container_width=True):
+                                pass  # nothing happens; user just edits the editor and resubmits
+                    else:
+                        st.info(
+                            "💡 You've already regenerated this topic. Use the chat on the **Lesson** tab "
+                            "to ask Watsonx specific questions about your code, then try again here."
+                        )
+
                 # Record performance if passed
                 if passed == total:
                     elapsed_time = int(time.time() - st.session_state[f'start_time_{current_topic_id}'])
@@ -573,79 +743,6 @@ with tab3:
                         
                         if st.button("🏠 Back to Home", type="primary", use_container_width=True):
                             st.switch_page("app.py")
-
-# ============================================================================
-# TAB 4: ASK WATSONX (interactive AI tutor chat)
-# ============================================================================
-with tab4:
-    st.markdown("### 💬 Ask Watsonx anything about this topic")
-    st.caption("Confused about something? Want another example? Ask away — Watsonx has the lesson loaded.")
-
-    chat_key = f'chat_history_{current_topic_id}'
-    chat_history = st.session_state[chat_key]
-
-    # Quick-prompt buttons (one-click suggestions for non-typers)
-    st.markdown("**Quick questions:**")
-    quick_cols = st.columns(3)
-    quick_prompts = [
-        ("🧒 ELI5", "Explain this topic to me like I'm 5 years old."),
-        ("🌍 Real example", "Give me a real-world example using something from my field."),
-        ("⚠️ Common mistake", "What's the most common mistake beginners make with this concept?"),
-    ]
-    pending_question = None
-    for col, (label, prompt) in zip(quick_cols, quick_prompts):
-        with col:
-            if st.button(label, key=f"quick_{label}_{current_topic_id}", use_container_width=True):
-                pending_question = prompt
-
-    st.markdown("---")
-
-    # Render existing chat history
-    for msg in chat_history:
-        with st.chat_message(msg['role']):
-            st.markdown(msg['content'])
-
-    # Free-form input (always shown)
-    typed_question = st.chat_input("Type your question...")
-
-    user_question = pending_question or typed_question
-
-    if user_question:
-        # Append user message
-        chat_history.append({"role": "user", "content": user_question})
-        with st.chat_message("user"):
-            st.markdown(user_question)
-
-        # Generate response
-        with st.chat_message("assistant"):
-            with st.spinner("Watsonx is thinking..."):
-                chat_prompt = build_topic_chat_prompt(
-                    topic_title=current_topic['title'],
-                    lesson_markdown=topic_content.get('lesson_markdown', ''),
-                    profile=st.session_state.profile,
-                    chat_history=chat_history[:-1],  # don't include the brand-new user message
-                    user_question=user_question,
-                )
-                answer = generate(
-                    prompt=chat_prompt,
-                    max_tokens=350,
-                    temperature=0.5,
-                )
-                if not answer or answer == "{}":
-                    answer = "Hmm, I'm having trouble responding right now. Try rephrasing, or check the AI Activity Log in the sidebar for connection status."
-                st.markdown(answer)
-
-        # Save assistant reply
-        chat_history.append({"role": "assistant", "content": answer})
-        st.session_state[chat_key] = chat_history
-        st.rerun()
-
-    # Clear chat button (only when there's history)
-    if chat_history:
-        st.markdown("---")
-        if st.button("🗑️ Clear chat history", key=f"clear_chat_{current_topic_id}"):
-            st.session_state[chat_key] = []
-            st.rerun()
 
 # Capstone unlock trigger
 if st.session_state.completed_topics:
