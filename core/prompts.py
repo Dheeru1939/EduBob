@@ -11,7 +11,21 @@ from typing import List, Dict, Optional
 # PROMPT TEMPLATES (Section 6 of plan)
 # ============================================================================
 
-ONBOARDING_NEXT_QUESTION_PROMPT = """You are a friendly coding mentor onboarding a new learner. Ask ONE multiple-choice question to understand their interests, motivation, or skill level. After 3 questions total, set `is_final: true` and stop. Vary your questions based on prior answers — if they said 'beginner', don't re-ask skill level.
+ONBOARDING_NEXT_QUESTION_PROMPT = """You are a friendly coding mentor onboarding a new learner. Ask ONE multiple-choice question to deeply understand them so we can personalize their Python curriculum.
+
+We need to learn FOUR things across 4 questions total (in any reasonable order, but cover all four):
+1. AGE BAND — to calibrate tone, pacing, and example domains (under 18 / 18–24 / 25–34 / 35–49 / 50+)
+2. LIFE CONTEXT — student, early-career professional, mid-career switching domains, side-hustler, returning to workforce, retired explorer
+3. CURRENT FIELD or AREA — what they spend their time on now (marketing, finance, healthcare, design, engineering, education, retail, sales, retired-from-X, student-of-Y, etc.) — this is GOLD for analogies later
+4. WHY they want to learn Python — career growth, domain switch, automate their job, build something specific, hobby, college prep
+
+Vary questions based on prior answers. NEVER ask about something they already told you. After 4 questions set `is_final: true`.
+
+Question style:
+- Conversational and warm
+- Multiple-choice with 4 distinct options
+- The 4th option for sensitive questions can be "Prefer not to say" or "Other"
+- Avoid jargon — write for a learner who may have never coded
 
 Prior Q&A history:
 {qa_history}
@@ -26,55 +40,116 @@ Respond with ONLY valid JSON matching this schema:
 No prose, no markdown fences. Just the JSON."""
 
 
-INTEREST_PROFILE_PROMPT = """Summarize this learner's profile from their answers. Pick 1-2 interest tags from: web, automation, data, ai, games, scripting, general.
+INTEREST_PROFILE_PROMPT = """Synthesize a rich learner profile from this Q&A history. Infer intelligently — if they said "I'm a marketing manager wanting to learn data," infer age_band from any age cue, life_context as "mid_career_switcher", current_field as "marketing", interests as ["data"], motivation as "career-growth pivot to data".
+
+Be SPECIFIC in current_field — don't write "professional", write "marketing analyst" or "ICU nurse" or "high school sophomore" — whatever the answers suggest. If they only said the broad category, use that.
 
 Q&A history:
 {qa_history}
 
 Respond with ONLY valid JSON matching this schema:
 {{
-  "interests": ["tag1", "tag2"],
-  "motivation": "brief summary of why they want to learn",
-  "skill_level": "absolute beginner | beginner | intermediate",
-  "preferred_style": "hands-on examples | theory-first | project-based"
+  "age_band": "under_18 | 18_24 | 25_34 | 35_49 | 50_plus",
+  "life_context": "student | early_career | mid_career_switcher | side_hustler | returning_to_workforce | retired_explorer",
+  "current_field": "specific free-text descriptor (e.g. 'marketing manager', 'ICU nurse', 'high school student studying biology', 'retired engineer')",
+  "interests": ["pick 1-2 from: web, automation, data, ai, games, scripting, general"],
+  "motivation": "one concise sentence in their own framing",
+  "skill_level": "absolute_beginner | beginner | intermediate",
+  "preferred_style": "hands-on | structured | project-based"
 }}
 
-No prose, no markdown fences. Just the JSON."""
+If a field truly cannot be inferred, use the first option as a safe default. No prose, no markdown fences. Just the JSON."""
 
 
-CURRICULUM_PROMPT = """Design a 5-topic Python curriculum SPECIFICALLY for this learner. The curriculum MUST be visibly different for different interests — do NOT default to generic "variables, loops, functions, lists, dicts."
-
-PERSONALIZATION RULES (mandatory):
-- If interests include "web": topics should reference URLs, HTML strings, JSON parsing, web data manipulation, simple HTTP-style examples
-- If interests include "automation": topics should reference file processing, scheduling concepts, batch operations, command-line style scripts
-- If interests include "data": topics should reference CSV-style records, statistics on lists, dictionaries as records, data cleaning
-- If interests include "ai" or "ml": topics should reference number lists, math operations, simple algorithms, decision logic
-- If interests include "games": topics should reference state, randomness, scoring, simple game loops
-- If skill_level is "absolute beginner": Topic 1 must be the gentlest possible intro; avoid jargon
-- If skill_level is "intermediate": Topic 1 can skip basics and start with something useful
-
-EXAMPLES of well-personalized topic 1 titles (match your style to the learner):
-- For web beginner: "Python Strings — Building Blocks of the Web"
-- For automation beginner: "Variables — Storing What Your Scripts Remember"
-- For data beginner: "Numbers and Lists — The Foundation of Datasets"
-- For ai beginner: "Variables and Math — How Models Store Knowledge"
-- For games beginner: "Variables — Tracking Score, Lives, and Time"
-
-ALL topics must use only standard Python (no external libraries). Each topic must be teachable in 15 minutes and have a code-challenge component.
+CURRICULUM_PROMPT = """Design a 5-topic Python curriculum SO PERSONALIZED that a peer educator would recognize the learner from the curriculum alone. Apply ALL personalization dimensions below — track_title, topic titles, summaries, and example domains must ALL visibly reflect the learner's profile.
 
 Learner profile:
 {profile}
 
-Now design a curriculum that a peer educator would IMMEDIATELY recognize as tailored to this exact learner. Topic titles, summaries, and the example domain must visibly reflect the profile.
+PERSONALIZATION DIMENSIONS (apply ALL that fit):
+
+1. By LIFE CONTEXT:
+   - "student": shorter conceptual lessons, school-relevant examples (gradebook, study tracker, homework helper), encourage curiosity over career framing
+   - "early_career": entry-level professional examples (data prep, internal tools), career-growth framing
+   - "mid_career_switcher": bridge from their current_field — explicit "you already know X from <field>, here's the Python equivalent" framing
+   - "side_hustler": entrepreneurial framing — automating side income, micro-products, freelance task automation
+   - "returning_to_workforce": refresher tone, patient pace, modern tooling reassurance, "you've got this"
+   - "retired_explorer": leisure framing, hobby projects (recipe organizer, photo sorter, garden tracker), no pressure
+
+2. By CURRENT FIELD (use as analogy bridge — examples should come from this domain):
+   - "marketing": campaign data, A/B tests, audience segments, social media stats, click-through rates
+   - "finance": portfolio data, budgets, financial ratios, expense trackers, stock series
+   - "healthcare": vitals tracking, schedule organization, patient lookup (anonymized), medication reminders
+   - "education": gradebook, attendance, lesson planner, class roster, exam analytics
+   - "design": color palette tools, asset organization, image metadata, naming conventions
+   - "engineering" or "STEM": sensor data, measurements, calculations, formula evaluation
+   - "sales / business development": CRM-like dictionaries, lead scoring, pipeline metrics
+   - "retail / hospitality": inventory tracking, order processing, scheduling
+   - "student in <subject>": connect Python to that subject (biology → DNA strings, history → date arithmetic, art → palette manipulation)
+   - "retired from <field>": gentle nostalgic-relevant examples without being patronizing
+   - For other fields: invent a relevant analogy bridge
+
+3. By AGE BAND (calibrate tone and lesson length):
+   - "under_18": shorter lessons (~150 words), playful tone, examples from games/social media/school life
+   - "18_24": college-aware tone, side-project framing, internship-relevant examples
+   - "25_34": professional tone, career-growth framing, work-relevant examples
+   - "35_49": confident peer-professional tone, efficiency-focused, time-respecting
+   - "50_plus": patient pace, no assumed jargon, life-experience-friendly examples, never patronizing
+
+4. By INTEREST AREA (which Python flavor to emphasize):
+   - "web": URLs, HTML strings, JSON, simple HTTP-style examples
+   - "automation": file processing, scheduling, batch operations
+   - "data": CSV-style records, list statistics, dict-as-record, data cleaning
+   - "ai" / "ml": number lists, math, decision logic, simple algorithms
+   - "games": state, randomness, scoring, game loops
+   - "scripting" / "general": utility scripts, calculators, tools
+
+5. By MOTIVATION:
+   - "career growth": tie skills to job market value
+   - "domain switch / pivot": bridge-building, "you already know more than you think"
+   - "automate work": every example saves them real time
+   - "build something specific": project-driven framing
+   - "curiosity / hobby": exploratory, "and here's an interesting fact"
+
+EXAMPLES of well-personalized track titles + topic 1 titles:
+
+A) 32-year-old marketing manager pivoting to data:
+   - track_title: "Python for Marketers Moving Into Data"
+   - topic 1: "Lists & Numbers — Your First Campaign Dataset"
+   - example domain throughout: campaign metrics, audience segments, click-through rates
+
+B) 45-year-old finance professional switching to AI:
+   - track_title: "Python for Finance Pros Stepping Into AI"
+   - topic 1: "Variables — From Cells to Code"
+   - example domain throughout: stock prices, portfolio weights, financial ratios
+
+C) 16-year-old high school student curious about web:
+   - track_title: "Python for the Web-Curious Teen"
+   - topic 1: "Strings — The Words Behind Every Webpage"
+   - example domain throughout: URLs of favorite sites, social media handles, game titles
+
+D) 60-year-old retired teacher learning for fun:
+   - track_title: "Python for Lifelong Learners"
+   - topic 1: "Variables — Storing Pieces of Information"
+   - example domain throughout: book lists, recipe ingredients, garden plant tracker
+
+E) 28-year-old software engineer wanting to add Python automation skills:
+   - track_title: "Python for Engineers Who Already Code"
+   - topic 1: "Strings & Files — The Automation Starter Kit"
+   - example domain throughout: log file parsing, batch renaming, CLI scripts
+
+ALL topics must use only standard Python (no external libraries). Each topic must be teachable in 15 minutes and have a code-challenge component.
+
+Now design THIS learner's curriculum. Topic titles must reference their specific situation. Summaries must name their field or context. The 5 topics together must form a coherent journey toward something they'd realistically want to build.
 
 Respond with ONLY valid JSON matching this schema:
 {{
-  "track_title": "Python for [personalized descriptor referencing their actual interest]",
+  "track_title": "Python for [highly specific descriptor of THIS learner]",
   "topics": [
     {{
       "id": 1,
-      "title": "Topic title that references their interest domain",
-      "summary": "1-2 sentence description that names their interest in the explanation",
+      "title": "Topic title that references their domain",
+      "summary": "1-2 sentence description naming their field/context in the explanation",
       "estimated_minutes": 15
     }}
   ]
@@ -83,7 +158,17 @@ Respond with ONLY valid JSON matching this schema:
 The topics array MUST contain exactly 5 entries (id 1 through 5). No prose, no markdown fences. Just the JSON."""
 
 
-TOPIC_CONTENT_PROMPT = """Generate complete topic content. Lesson must be 200-400 words of friendly markdown. Quiz: 3 multiple-choice questions, each with 4 options. Code challenge: a function-writing task with 2 test cases. Test cases must be deterministic and runnable via `exec()` in a restricted namespace (no imports, no I/O).
+TOPIC_CONTENT_PROMPT = """Generate complete topic content for THIS specific learner. Lesson must be friendly markdown (length: 150 words for under_18, 200-400 words otherwise). Quiz: 3 multiple-choice questions, each with 4 options. Code challenge: a function-writing task with 2 test cases. Test cases must be deterministic and runnable via `exec()` in a restricted namespace (no imports, no I/O).
+
+ALL examples in the lesson, quiz scenarios, and code challenge MUST come from the learner's `current_field` and reflect their `life_context`. Do not use generic examples like "shopping cart" or "todo list" unless they fit the learner's domain.
+
+Tone calibration:
+- "under_18": playful, encouraging, exclamation points OK
+- "18_24": peer-friendly, college-aware
+- "25_34" / "35_49": professional, time-respecting, no fluff
+- "50_plus": warm, patient, never patronizing
+
+Bridge framing for "mid_career_switcher": at least one sentence in the lesson should connect this Python concept to something they already know from their current_field (e.g., "If you've used pivot tables in Excel, dictionaries are the same idea in code").
 
 Topic specification:
 {topic_spec}

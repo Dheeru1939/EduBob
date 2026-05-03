@@ -104,7 +104,22 @@ if not st.session_state.curriculum:
                 },
             }
 
-            st.session_state.curriculum = FALLBACK_BY_INTEREST.get(primary, {
+            # Layer life_context into the track title for extra personalization
+            life_ctx = st.session_state.profile.get("life_context", "")
+            field = st.session_state.profile.get("current_field", "")
+            ctx_descriptor = ""
+            if life_ctx == "student":
+                ctx_descriptor = " for Curious Students"
+            elif life_ctx == "mid_career_switcher":
+                ctx_descriptor = f" for {field.title()} Pros Pivoting" if field and field != "general" else " for Career Switchers"
+            elif life_ctx == "side_hustler":
+                ctx_descriptor = " for Side-Project Builders"
+            elif life_ctx == "returning_to_workforce":
+                ctx_descriptor = " — A Refresher Path"
+            elif life_ctx == "retired_explorer":
+                ctx_descriptor = " for Lifelong Learners"
+
+            base_fallback = FALLBACK_BY_INTEREST.get(primary, {
                 "track_title": f"Python Fundamentals for {primary.title()} Enthusiasts",
                 "topics": [
                     {"id": 1, "title": "Variables and Data Types", "summary": "Learn to store and work with different types of data in Python.", "estimated_minutes": 15},
@@ -114,6 +129,12 @@ if not st.session_state.curriculum:
                     {"id": 5, "title": "Lists and Data Structures", "summary": "Work with collections of data using Python's built-in structures.", "estimated_minutes": 15},
                 ],
             })
+
+            # Apply context descriptor to make fallback feel personalized too
+            personalized_fallback = dict(base_fallback)
+            personalized_fallback["track_title"] = base_fallback["track_title"] + ctx_descriptor
+
+            st.session_state.curriculum = personalized_fallback
             time.sleep(1)
             st.rerun()
 

@@ -31,7 +31,7 @@ if 'onboarding_complete' not in st.session_state:
     st.session_state.onboarding_complete = False
 
 # Progress indicator
-total_questions = 3
+total_questions = 4
 current_count = len(st.session_state.onboarding_qa)
 
 if current_count < total_questions:
@@ -61,25 +61,36 @@ if not st.session_state.current_question and current_count < total_questions:
         if question_data and "question" in question_data:
             st.session_state.current_question = question_data
         else:
-            # Fallback questions — vary by which question we're on so we never repeat
+            # Fallback questions — vary per index so we never repeat
+            # Designed to capture: age, life context + field, motivation, learning style
             fallback_questions = [
                 {
-                    "question": "What's your current programming skill level?",
+                    "question": "Roughly which age range fits you best?",
                     "options": [
-                        "Absolute beginner (never coded before)",
-                        "Beginner (some basic experience)",
-                        "Intermediate (comfortable with basics)",
-                        "Advanced (experienced programmer)"
+                        "Under 18 (still in school)",
+                        "18–24 (college / early career)",
+                        "25–34 (building my career)",
+                        "35+ (established or pivoting)"
                     ],
                     "is_final": False
                 },
                 {
-                    "question": "What kind of projects excite you most?",
+                    "question": "Which best describes your current situation?",
                     "options": [
-                        "Websites and web apps",
-                        "Automating boring tasks",
-                        "Working with data and analytics",
-                        "AI and machine learning"
+                        "Student exploring tech",
+                        "Working professional in a non-tech field (marketing, finance, healthcare, etc.)",
+                        "Working professional in tech wanting more skills",
+                        "Career switcher / returning to workforce / lifelong learner"
+                    ],
+                    "is_final": False
+                },
+                {
+                    "question": "What do you most want to do with Python?",
+                    "options": [
+                        "Build websites or web tools",
+                        "Automate tasks at work or home",
+                        "Analyze data from my field",
+                        "Explore AI / ML or just learn for fun"
                     ],
                     "is_final": False
                 },
@@ -87,14 +98,14 @@ if not st.session_state.current_question and current_count < total_questions:
                     "question": "How do you learn best?",
                     "options": [
                         "Hands-on with lots of examples",
-                        "Reading concepts then practicing",
-                        "Building real small projects",
-                        "Watching, then trying it myself"
+                        "Step-by-step structured explanations",
+                        "Project-based — build first, learn as I go",
+                        "Mix of all three"
                     ],
                     "is_final": True
                 }
             ]
-            st.session_state.current_question = fallback_questions[min(current_count, 2)]
+            st.session_state.current_question = fallback_questions[min(current_count, 3)]
 
 # Display current question
 if st.session_state.current_question and current_count < total_questions:
@@ -162,13 +173,52 @@ elif st.session_state.onboarding_complete and not st.session_state.profile:
             time.sleep(1)
             st.switch_page("pages/2_📚_Curriculum.py")
         else:
-            # Fallback profile
-            st.warning("⚠️ Could not parse profile. Using default settings.")
+            # Fallback profile — infer best-effort from QA history
+            st.warning("⚠️ Could not parse profile. Using inferred defaults from your answers.")
+            qa_text = " ".join([f"{qa['answer']}" for qa in st.session_state.onboarding_qa]).lower()
+
+            # Infer age band
+            if "under 18" in qa_text or "school" in qa_text:
+                age = "under_18"
+            elif "18" in qa_text or "24" in qa_text or "college" in qa_text:
+                age = "18_24"
+            elif "25" in qa_text or "34" in qa_text or "career" in qa_text:
+                age = "25_34"
+            else:
+                age = "35_49"
+
+            # Infer life context
+            if "student" in qa_text:
+                ctx = "student"
+            elif "non-tech" in qa_text or "marketing" in qa_text or "finance" in qa_text:
+                ctx = "mid_career_switcher"
+            elif "tech wanting" in qa_text or "in tech" in qa_text:
+                ctx = "early_career"
+            elif "switcher" in qa_text or "returning" in qa_text or "lifelong" in qa_text:
+                ctx = "mid_career_switcher"
+            else:
+                ctx = "early_career"
+
+            # Infer interest
+            if "data" in qa_text or "analyze" in qa_text:
+                interest = "data"
+            elif "automat" in qa_text:
+                interest = "automation"
+            elif "web" in qa_text:
+                interest = "web"
+            elif "ai" in qa_text or "ml" in qa_text:
+                interest = "ai"
+            else:
+                interest = "general"
+
             st.session_state.profile = {
-                "interests": ["general"],
-                "motivation": "learn Python programming",
+                "age_band": age,
+                "life_context": ctx,
+                "current_field": "general",
+                "interests": [interest],
+                "motivation": "learn Python for personal growth",
                 "skill_level": "beginner",
-                "preferred_style": "hands-on examples"
+                "preferred_style": "hands-on"
             }
             time.sleep(2)
             st.switch_page("pages/2_📚_Curriculum.py")
