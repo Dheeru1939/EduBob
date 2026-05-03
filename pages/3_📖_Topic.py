@@ -18,6 +18,7 @@ from core.watsonx_client import generate, generate_json
 from core.prompts import (
     build_topic_content_prompt,
     build_code_feedback_prompt,
+    build_topic_chat_prompt,
     parse_json_response
 )
 from core.code_runner import run_code_with_tests
@@ -134,8 +135,12 @@ if adaptation_directive:
     </div>
     """, unsafe_allow_html=True)
 
-# Three tabs
-tab1, tab2, tab3 = st.tabs(["📚 Lesson", "❓ Quiz", "💻 Challenge"])
+# Initialize per-topic chat history
+if f'chat_history_{current_topic_id}' not in st.session_state:
+    st.session_state[f'chat_history_{current_topic_id}'] = []
+
+# Four tabs (Lesson, Quiz, Challenge, Ask Watsonx)
+tab1, tab2, tab3, tab4 = st.tabs(["📚 Lesson", "❓ Quiz", "💻 Challenge", "💬 Ask Watsonx"])
 
 # ============================================================================
 # TAB 1: LESSON
@@ -413,6 +418,79 @@ with tab3:
                         
                         if st.button("🏠 Back to Home", type="primary", use_container_width=True):
                             st.switch_page("app.py")
+
+# ============================================================================
+# TAB 4: ASK WATSONX (interactive AI tutor chat)
+# ============================================================================
+with tab4:
+    st.markdown("### 💬 Ask Watsonx anything about this topic")
+    st.caption("Confused about something? Want another example? Ask away — Watsonx has the lesson loaded.")
+
+    chat_key = f'chat_history_{current_topic_id}'
+    chat_history = st.session_state[chat_key]
+
+    # Quick-prompt buttons (one-click suggestions for non-typers)
+    st.markdown("**Quick questions:**")
+    quick_cols = st.columns(3)
+    quick_prompts = [
+        ("🧒 ELI5", "Explain this topic to me like I'm 5 years old."),
+        ("🌍 Real example", "Give me a real-world example using something from my field."),
+        ("⚠️ Common mistake", "What's the most common mistake beginners make with this concept?"),
+    ]
+    pending_question = None
+    for col, (label, prompt) in zip(quick_cols, quick_prompts):
+        with col:
+            if st.button(label, key=f"quick_{label}_{current_topic_id}", use_container_width=True):
+                pending_question = prompt
+
+    st.markdown("---")
+
+    # Render existing chat history
+    for msg in chat_history:
+        with st.chat_message(msg['role']):
+            st.markdown(msg['content'])
+
+    # Free-form input (always shown)
+    typed_question = st.chat_input("Type your question...")
+
+    user_question = pending_question or typed_question
+
+    if user_question:
+        # Append user message
+        chat_history.append({"role": "user", "content": user_question})
+        with st.chat_message("user"):
+            st.markdown(user_question)
+
+        # Generate response
+        with st.chat_message("assistant"):
+            with st.spinner("Watsonx is thinking..."):
+                chat_prompt = build_topic_chat_prompt(
+                    topic_title=current_topic['title'],
+                    lesson_markdown=topic_content.get('lesson_markdown', ''),
+                    profile=st.session_state.profile,
+                    chat_history=chat_history[:-1],  # don't include the brand-new user message
+                    user_question=user_question,
+                )
+                answer = generate(
+                    prompt=chat_prompt,
+                    max_tokens=350,
+                    temperature=0.5,
+                )
+                if not answer or answer == "{}":
+                    answer = "Hmm, I'm having trouble responding right now. Try rephrasing, or check the AI Activity Log in the sidebar for connection status."
+                st.markdown(answer)
+
+        # Save assistant reply
+        chat_history.append({"role": "assistant", "content": answer})
+        st.session_state[chat_key] = chat_history
+        st.rerun()
+
+    # Clear chat button (only when there's history)
+    if chat_history:
+        st.markdown("---")
+        if st.button("🗑️ Clear chat history", key=f"clear_chat_{current_topic_id}"):
+            st.session_state[chat_key] = []
+            st.rerun()
 
 # Capstone unlock trigger
 if st.session_state.completed_topics:

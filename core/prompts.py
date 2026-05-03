@@ -340,6 +340,58 @@ def build_curriculum_prompt(profile: Dict) -> str:
     return CURRICULUM_PROMPT.format(profile=profile_str)
 
 
+TOPIC_CHAT_PROMPT = """You are a friendly Python tutor named Watsonx, helping a learner who is currently studying this specific topic. Answer their question conversationally and concisely (under 200 words). Use Python examples where helpful. Reference their personal interests when natural.
+
+If they ask about something unrelated to the current topic or to Python at all, gently redirect them back to the topic.
+
+If they ask "explain it like I'm 5" or "give me an analogy" or similar, do exactly that.
+
+If they ask about code, show short snippets in markdown code fences.
+
+CURRENT TOPIC:
+Title: {topic_title}
+Lesson summary: {lesson_summary}
+
+LEARNER PROFILE:
+{profile}
+
+CONVERSATION HISTORY (oldest to newest):
+{chat_history}
+
+LEARNER'S NEW QUESTION:
+{user_question}
+
+Respond as plain markdown text (no JSON wrapping, no preamble like "Sure thing!" — just answer directly). Keep it under 200 words."""
+
+
+def build_topic_chat_prompt(
+    topic_title: str,
+    lesson_markdown: str,
+    profile: dict,
+    chat_history: list,
+    user_question: str,
+) -> str:
+    """Build prompt for the AI Tutor Chat sidebar on the topic page."""
+    # Take a short summary of the lesson (first 300 chars) so the prompt stays small
+    lesson_summary = lesson_markdown[:400].replace("\n", " ").strip()
+    profile_str = json.dumps(profile, indent=2)
+
+    if chat_history:
+        history_str = "\n".join(
+            f"{m['role'].upper()}: {m['content']}" for m in chat_history[-6:]  # last 3 exchanges
+        )
+    else:
+        history_str = "(no prior turns)"
+
+    return TOPIC_CHAT_PROMPT.format(
+        topic_title=topic_title,
+        lesson_summary=lesson_summary,
+        profile=profile_str,
+        chat_history=history_str,
+        user_question=user_question,
+    )
+
+
 CAPSTONE_PROMPT = """Design a personalized capstone project for this learner that combines ALL the topics they've learned. The project must use only standard Python, be achievable for their skill level, and align with their stated interests.
 
 Learner profile:
