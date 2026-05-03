@@ -5,8 +5,8 @@ Personalized project that combines all learned topics
 
 import streamlit as st
 from core.state import init_session
-from core.watsonx_client import generate
-from core.prompts import build_capstone_prompt, parse_json_response
+from core.watsonx_client import generate_json
+from core.prompts import build_capstone_prompt
 
 init_session()
 
@@ -24,10 +24,16 @@ if 'capstone' not in st.session_state or st.session_state.capstone is None:
             st.session_state.profile,
             st.session_state.curriculum.get('topics', [])
         )
-        response = generate(prompt, max_tokens=600, temperature=0.6)
-        capstone = parse_json_response(response)
+        # Retry-on-failure + validate the result has required fields
+        capstone = generate_json(
+            prompt=prompt,
+            max_tokens=500,
+            temperature=0.6,
+            validator=lambda r: isinstance(r, dict) and "project_title" in r and "build_steps" in r,
+        )
         st.session_state.capstone = capstone
-        st.snow()  # Moment of magic for capstone reveal
+        if capstone:
+            st.snow()  # Moment of magic for capstone reveal
 
 capstone = st.session_state.capstone
 if not capstone:

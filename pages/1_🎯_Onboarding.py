@@ -6,7 +6,7 @@ Dynamic AI-generated questions to understand learner interests
 import streamlit as st
 import time
 from core.state import init_session
-from core.watsonx_client import generate
+from core.watsonx_client import generate, generate_json
 from core.prompts import (
     build_onboarding_next_question_prompt,
     build_interest_profile_prompt,
@@ -138,19 +138,17 @@ elif st.session_state.onboarding_complete and not st.session_state.profile:
     with st.spinner("🧠 Watsonx is analyzing your profile and creating your personalized curriculum..."):
         # Build profile generation prompt
         prompt = build_interest_profile_prompt(st.session_state.onboarding_qa)
-        
-        # Call watsonx.ai
-        response = generate(
+
+        # Call watsonx.ai with retry + validation
+        profile = generate_json(
             prompt=prompt,
             system="You are an educational AI analyzing learner profiles.",
             max_tokens=400,
-            temperature=0.3
+            temperature=0.3,
+            validator=lambda r: isinstance(r, dict) and "interests" in r and isinstance(r.get("interests"), list),
         )
-        
-        # Parse profile
-        profile = parse_json_response(response)
-        
-        if profile and "interests" in profile:
+
+        if profile:
             st.session_state.profile = profile
             
             # Show profile summary

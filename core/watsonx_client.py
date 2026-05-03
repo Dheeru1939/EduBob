@@ -130,7 +130,7 @@ def generate(
         try:
             from core.state import log_ai_activity
             log_ai_activity("AI generation", input_tokens + output_tokens)
-        except:
+        except Exception:
             pass  # Not in Streamlit context
         
         return generated_text.strip()
@@ -139,6 +139,85 @@ def generate(
         print(f"ERROR in watsonx.ai generate(): {e}")
         print(f"   Returning empty JSON fallback")
         return "{}"
+
+
+def generate_json(
+    prompt: str,
+    system: str = "",
+    max_tokens: int = 1200,
+    temperature: float = 0.3,
+    validator=None,
+) -> Optional[dict]:
+    """
+    Generate, parse JSON, and retry once on failure with a stricter prompt.
+
+    Args:
+        prompt: The user prompt
+        system: Optional system message
+        max_tokens: Token limit
+        temperature: Sampling temp (lowered automatically on retry for determinism)
+        validator: Optional callable(parsed_dict) -> bool. If provided, parsed result
+                   must pass validation; otherwise treated as failure.
+
+    Returns:
+        Parsed dict on success, None on failure (caller falls back).
+
+    Side effects:
+        - On success: resets the AI failure streak counter
+        - On failure: increments the AI failure streak counter
+    """
+    # Local import to avoid circular dependency at module load time
+    from core.prompts import parse_json_response
+
+    def _try_parse(text: str) -> Optional[dict]:
+        result = parse_json_response(text)
+        if result is None:
+            return None
+        if validator and not validator(result):
+            return None
+        return result
+
+    # First attempt
+    response = generate(prompt, system=system, max_tokens=max_tokens, temperature=temperature)
+    parsed = _try_parse(response)
+    if parsed is not None:
+        try:
+            from core.state import reset_ai_failure_count
+            reset_ai_failure_count()
+        except Exception:
+            pass
+        return parsed
+
+    # Retry once with a stricter system prompt and lower temperature
+    print("⚠ First generation produced unparseable JSON — retrying with stricter prompt")
+    strict_system = (
+        (system + "\n\n" if system else "")
+        + "CRITICAL: Output ONLY a single valid JSON object. No prose before or after. "
+        + "No code fences. No commentary. The very first character of your response MUST be `{` "
+        + "and the very last character MUST be `}`."
+    )
+    response = generate(
+        prompt,
+        system=strict_system,
+        max_tokens=max_tokens,
+        temperature=max(0.1, temperature - 0.2),
+    )
+    parsed = _try_parse(response)
+    if parsed is not None:
+        try:
+            from core.state import reset_ai_failure_count
+            reset_ai_failure_count()
+        except Exception:
+            pass
+        return parsed
+
+    # Both attempts failed
+    try:
+        from core.state import record_ai_failure
+        record_ai_failure()
+    except Exception:
+        pass
+    return None
 
 
 def test_connection():

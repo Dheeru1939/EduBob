@@ -6,7 +6,7 @@ Displays personalized 5-topic learning path with lock/unlock mechanics
 import streamlit as st
 import time
 from core.state import init_session, is_topic_unlocked, is_topic_completed
-from core.watsonx_client import generate
+from core.watsonx_client import generate, generate_json
 from core.prompts import build_curriculum_prompt, parse_json_response
 
 # Initialize session
@@ -29,20 +29,18 @@ if not st.session_state.curriculum:
     with st.spinner("🤖 Watsonx is designing your personal Python journey..."):
         # Build curriculum prompt
         prompt = build_curriculum_prompt(st.session_state.profile)
-        
-        # Call watsonx.ai
+
+        # Call watsonx.ai with retry-on-failure + structural validation
         # Lower max_tokens for speed; higher temp for variety across users
-        response = generate(
+        curriculum = generate_json(
             prompt=prompt,
             system="You are an expert curriculum designer creating PERSONALIZED Python learning paths. Always tailor topics to the learner's stated interests.",
             max_tokens=800,
-            temperature=0.7
+            temperature=0.7,
+            validator=lambda r: isinstance(r, dict) and "topics" in r and len(r.get("topics", [])) == 5,
         )
-        
-        # Parse curriculum
-        curriculum = parse_json_response(response)
-        
-        if curriculum and "topics" in curriculum and len(curriculum["topics"]) == 5:
+
+        if curriculum:
             st.session_state.curriculum = curriculum
             st.success("✅ Curriculum generated!")
             time.sleep(1)

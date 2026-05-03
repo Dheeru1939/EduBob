@@ -14,7 +14,7 @@ from core.state import (
     record_performance,
     get_adaptation_directive
 )
-from core.watsonx_client import generate
+from core.watsonx_client import generate, generate_json
 from core.prompts import (
     build_topic_content_prompt,
     build_code_feedback_prompt,
@@ -66,26 +66,32 @@ if current_topic_id not in st.session_state.topic_contents:
     with st.spinner("🤖 Watsonx is preparing your lesson, quiz, and challenge..."):
         # Get adaptation directive if exists
         adaptation_directive = get_adaptation_directive(current_topic_id)
-        
+
         # Build prompt
         prompt = build_topic_content_prompt(
             topic_spec=current_topic,
             profile=st.session_state.profile,
             adaptation_directive=adaptation_directive
         )
-        
-        # Call watsonx.ai
-        response = generate(
+
+        # Call watsonx.ai with retry-on-failure + schema validation
+        # max_tokens reduced to 1200 (lessons are 200-400 words; was 1500 with headroom waste)
+        content = generate_json(
             prompt=prompt,
             system="You are an expert Python educator creating engaging, personalized learning content.",
-            max_tokens=1500,
-            temperature=0.5
+            max_tokens=1200,
+            temperature=0.5,
+            validator=lambda r: (
+                isinstance(r, dict)
+                and "lesson_markdown" in r
+                and "quiz" in r
+                and "challenge" in r
+                and isinstance(r.get("quiz"), list)
+                and len(r.get("quiz", [])) >= 1
+            ),
         )
-        
-        # Parse content
-        content = parse_json_response(response)
-        
-        if content and "lesson_markdown" in content and "quiz" in content and "challenge" in content:
+
+        if content:
             st.session_state.topic_contents[current_topic_id] = content
             st.success("✅ Content generated!")
             time.sleep(1)

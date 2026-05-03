@@ -4,7 +4,7 @@ Main Streamlit Entry Point
 """
 
 import streamlit as st
-from core.state import init_session, reset_session, get_progress_summary
+from core.state import init_session, reset_session, get_progress_summary, get_ai_failure_count
 
 # Page configuration
 st.set_page_config(
@@ -90,6 +90,15 @@ with st.sidebar:
         reset_session()
         st.rerun()
     
+    # AI failure warning (shown only when there's a problem)
+    failure_count = get_ai_failure_count()
+    if failure_count >= 2:
+        st.warning(
+            f"⚠️ Watsonx.ai has failed {failure_count} consecutive times. "
+            "Check your `.env` credentials, watsonx project quota, and internet. "
+            "The app will keep working with fallback content."
+        )
+
     st.markdown("---")
     st.caption("Built with IBM Bob + watsonx.ai")
 

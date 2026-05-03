@@ -223,27 +223,42 @@ def get_adaptation_directive(topic_id: int) -> Optional[Dict[str, Any]]:
     return None
 
 
-if __name__ == "__main__":
-    print("state.py - Session state management module")
-    print("This module is designed to be used with Streamlit")
-    print("Run with: streamlit run app.py")
-
-# Made with Bob
-
-
 def log_ai_activity(action: str, tokens: int = 0):
     """
     Record an AI call for the sidebar transparency panel.
-    
+
     Args:
         action: Description of the AI action (e.g., "Generated onboarding question")
         tokens: Number of tokens used (approximate)
     """
     from datetime import datetime
-    
+
     if 'ai_activity_log' in st.session_state:
         st.session_state.ai_activity_log.append({
             "time": datetime.now().strftime("%H:%M:%S"),
             "action": action,
             "tokens": tokens
         })
+
+
+def get_ai_failure_count() -> int:
+    """Count consecutive AI generation failures (for surfacing user-visible errors)."""
+    return st.session_state.get('ai_failure_streak', 0)
+
+
+def record_ai_failure():
+    """Increment the consecutive failure counter."""
+    st.session_state.ai_failure_streak = st.session_state.get('ai_failure_streak', 0) + 1
+
+
+def reset_ai_failure_count():
+    """Reset failure counter (call after a successful generation)."""
+    st.session_state.ai_failure_streak = 0
+
+
+if __name__ == "__main__":
+    print("state.py - Session state management module")
+    print("This module is designed to be used with Streamlit")
+    print("Run with: streamlit run app.py")
+
+# Made with Bob

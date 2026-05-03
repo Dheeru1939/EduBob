@@ -219,22 +219,6 @@ def build_curriculum_prompt(profile: Dict) -> str:
     return CURRICULUM_PROMPT.format(profile=profile_str)
 
 
-def build_capstone_prompt(profile: dict, topics: list) -> str:
-    """
-    Build prompt for generating personalized capstone project.
-    
-    Args:
-        profile: Interest profile dict
-        topics: List of completed topic dicts with title and summary
-    
-    Returns:
-        Formatted prompt string
-    """
-    profile_str = json.dumps(profile, indent=2)
-    topics_str = "\n".join([f"- {t['title']}: {t.get('summary', 'Core concepts')}" for t in topics])
-    return CAPSTONE_PROMPT.format(profile=profile_str, topics=topics_str)
-
-
 CAPSTONE_PROMPT = """Design a personalized capstone project for this learner that combines ALL the topics they've learned. The project must use only standard Python, be achievable for their skill level, and align with their stated interests.
 
 Learner profile:
@@ -253,6 +237,22 @@ Respond with ONLY valid JSON matching this schema:
 }}
 
 No prose, no markdown fences. Just the JSON."""
+
+
+def build_capstone_prompt(profile: dict, topics: list) -> str:
+    """
+    Build prompt for generating personalized capstone project.
+
+    Args:
+        profile: Interest profile dict
+        topics: List of completed topic dicts with title and summary
+
+    Returns:
+        Formatted prompt string
+    """
+    profile_str = json.dumps(profile, indent=2)
+    topics_str = "\n".join([f"- {t['title']}: {t.get('summary', 'Core concepts')}" for t in topics])
+    return CAPSTONE_PROMPT.format(profile=profile_str, topics=topics_str)
 
 
 def build_topic_content_prompt(

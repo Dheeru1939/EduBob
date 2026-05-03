@@ -14,7 +14,7 @@
 - 🎯 Dynamic onboarding with AI-generated questions
 - 📚 Personalized 5-topic Python curriculum
 - 📖 AI-generated lessons, quizzes, and coding challenges
-- 🤖 Real-time code review with granite-3-8b-instruct
+- 🤖 Real-time code review with Llama 3.3 70B Instruct via watsonx.ai
 - 🔄 Adaptive learning that adjusts difficulty based on performance
 
 ---
@@ -197,38 +197,38 @@
 ## Watsonx.ai Integration Points
 
 ### 1. Onboarding Questions (Dynamic)
-- **Model:** granite-3-8b-instruct
+- **Model:** Llama 3.3 70B Instruct via watsonx.ai
 - **Temperature:** 0.5 (varied questions)
 - **Tokens:** ~300 per question
 - **Purpose:** Generate contextual follow-up questions
 
 ### 2. Interest Profile Synthesis
-- **Model:** granite-3-8b-instruct
+- **Model:** Llama 3.3 70B Instruct via watsonx.ai
 - **Temperature:** 0.3 (consistent)
 - **Tokens:** ~400
 - **Purpose:** Extract learner profile from Q&A
 
 ### 3. Curriculum Generation
-- **Model:** granite-3-8b-instruct
+- **Model:** Llama 3.3 70B Instruct via watsonx.ai
 - **Temperature:** 0.4 (creative but structured)
 - **Tokens:** ~1200
 - **Purpose:** Create personalized 5-topic learning path
 
 ### 4. Topic Content Generation
-- **Model:** granite-3-8b-instruct
+- **Model:** Llama 3.3 70B Instruct via watsonx.ai
 - **Temperature:** 0.5 (engaging content)
 - **Tokens:** ~1500 per topic
 - **Purpose:** Generate lesson, quiz, and challenge
 - **Adaptation:** Incorporates directive from previous performance
 
 ### 5. Code Review & Feedback
-- **Model:** granite-3-8b-instruct
+- **Model:** Llama 3.3 70B Instruct via watsonx.ai
 - **Temperature:** 0.4 (balanced)
 - **Tokens:** ~500 per submission
 - **Purpose:** Provide pedagogical feedback on student code
 
 ### 6. Adaptation Directive
-- **Model:** granite-3-8b-instruct
+- **Model:** Llama 3.3 70B Instruct via watsonx.ai
 - **Temperature:** 0.4
 - **Tokens:** ~300
 - **Purpose:** Analyze performance and prescribe next topic adjustments
@@ -434,7 +434,7 @@
 
 ## Conclusion
 
-EduBob v2 demonstrates that **adaptive, personalized learning is achievable with modern LLMs** without requiring traditional ML infrastructure. By leveraging IBM watsonx.ai's granite-3-8b-instruct model for both content generation and performance analysis, we've created a system that genuinely adapts to each learner's needs.
+EduBob v2 demonstrates that **adaptive, personalized learning is achievable with modern LLMs** without requiring traditional ML infrastructure. By leveraging IBM watsonx.ai's Llama 3.3 70B Instruct via watsonx.ai model for both content generation and performance analysis, we've created a system that genuinely adapts to each learner's needs.
 
 **Built entirely with IBM Bob in under 5 hours**, this project showcases the power of AI-assisted software development for solving real educational challenges.
 
