@@ -41,6 +41,79 @@ st.markdown("""
         border-radius: 8px;
         margin: 16px 0;
     }
+    /* Hero card on home page */
+    .hero-card {
+        background: linear-gradient(135deg, #0066CC 0%, #00A3E0 50%, #6366F1 100%);
+        color: white;
+        padding: 40px 32px;
+        border-radius: 18px;
+        margin: 8px 0 24px 0;
+        box-shadow: 0 8px 24px rgba(0, 102, 204, 0.18);
+    }
+    .hero-card h2 { color: white !important; margin-top: 0; font-size: 32px; }
+    .hero-card p { color: rgba(255,255,255,0.92); font-size: 16px; line-height: 1.6; margin: 8px 0; }
+    .hero-tag {
+        display: inline-block;
+        background: rgba(255,255,255,0.18);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+    }
+    /* Feature pills on home page */
+    .feature-pill {
+        background: white;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 18px 16px;
+        text-align: center;
+        height: 100%;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .feature-pill:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.06);
+    }
+    .feature-pill .icon { font-size: 28px; margin-bottom: 8px; }
+    .feature-pill .title { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 4px; }
+    .feature-pill .desc { font-size: 12px; color: #64748B; }
+    /* Topic flow breadcrumb */
+    .flow-breadcrumb {
+        display: flex;
+        gap: 4px;
+        margin: 8px 0 16px 0;
+        font-size: 13px;
+    }
+    .flow-step {
+        padding: 6px 14px;
+        border-radius: 16px;
+        background: #F0F4F8;
+        color: #64748B;
+        font-weight: 500;
+    }
+    .flow-step.active {
+        background: linear-gradient(135deg, #0066CC, #00A3E0);
+        color: white;
+    }
+    .flow-step.done {
+        background: #DCFCE7;
+        color: #166534;
+    }
+    /* Certificate styling */
+    .cert-card {
+        background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+        border: 3px double #D97706;
+        border-radius: 12px;
+        padding: 32px 28px;
+        text-align: center;
+        margin: 24px 0;
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.12);
+    }
+    .cert-card h2 { color: #92400E !important; margin: 0 0 8px 0; }
+    .cert-card .cert-name { font-size: 24px; font-weight: 700; color: #1F2937; margin: 16px 0; }
+    .cert-card .cert-stats { color: #4B5563; font-size: 14px; margin: 8px 0; }
     /* Fade-in animations */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
@@ -48,6 +121,7 @@ st.markdown("""
     }
     .element-container { animation: fadeIn 0.4s ease-out; }
     .adapt-banner { animation: fadeIn 0.6s ease-out; }
+    .hero-card { animation: fadeIn 0.5s ease-out; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -133,29 +207,72 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Built with IBM Bob + watsonx.ai")
 
+# ============================================================================
 # Main content
-st.title("🤖 Welcome to EduBob")
+# ============================================================================
 
 # Check onboarding status
 if not st.session_state.profile:
-    # User hasn't completed onboarding
+    # ---------- Hero card ----------
     st.markdown("""
-    ### Your Adaptive AI Python Tutor
-    
-    EduBob personalizes your learning journey:
-    
-    - 🎯 **Personalized curriculum** based on your interests
-    - 📚 **AI-generated lessons** tailored to you
-    - 💻 **Hands-on coding challenges** with instant feedback
-    - 🔄 **Adaptive learning** that adjusts to your pace
-    
-    Let's get started by understanding what you want to learn!
-    """)
-    
-    st.markdown("---")
-    
-    if st.button("🚀 Start Learning", type="primary", use_container_width=True):
-        st.switch_page("pages/1_🎯_Onboarding.py")
+    <div class='hero-card'>
+        <span class='hero-tag'>POWERED BY IBM watsonx.ai</span>
+        <h2>🤖 Meet EduBob — Your Adaptive AI Python Tutor</h2>
+        <p>EduBob doesn't just teach Python. It learns <strong>how you learn</strong>, then re-shapes
+        every lesson, quiz, example, and project around your age, profession, interests, and pace.
+        No two learners get the same curriculum.</p>
+        <p style="margin-top:12px;">Built end-to-end with <strong>IBM Bob</strong>, powered by
+        <strong>IBM watsonx.ai</strong>, in less than a day.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ---------- 4 feature pills ----------
+    fcols = st.columns(4)
+    features = [
+        ("🎯", "Dynamic Onboarding", "AI asks 3-6 questions to deeply understand you"),
+        ("📚", "Personalized Curriculum", "5 topics tailored to your field and goals"),
+        ("🤖", "Adaptive Lessons", "Multi-mode explanations + AI chat per topic"),
+        ("🧬", "Pattern Detection", "AI learns how you learn, evolves with you"),
+    ]
+    for col, (icon, title, desc) in zip(fcols, features):
+        with col:
+            st.markdown(f"""
+            <div class='feature-pill'>
+                <div class='icon'>{icon}</div>
+                <div class='title'>{title}</div>
+                <div class='desc'>{desc}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("")
+    st.markdown("")
+
+    # ---------- CTA + secondary info ----------
+    cta_col1, cta_col2, cta_col3 = st.columns([1, 2, 1])
+    with cta_col2:
+        if st.button("🚀  Start Learning  →", type="primary", use_container_width=True):
+            st.switch_page("pages/1_🎯_Onboarding.py")
+
+    st.markdown("")
+    with st.expander("💡 What makes this different from a generic tutorial?"):
+        st.markdown("""
+        Most tutorials show the same path to everyone. **EduBob is different:**
+
+        - **A 32-year-old marketing manager** wanting to learn data → gets curriculum framed in
+          campaign metrics, A/B tests, and audience segments
+        - **A 16-year-old gamer** curious about web → gets curriculum framed in clan websites,
+          gaming clans, and tournament data
+        - **A 60-year-old retired teacher** learning for fun → gets gentle pace, recipe organizers,
+          garden trackers, and patient tone
+
+        Behind the scenes, **7 different watsonx.ai prompts** drive every product moment:
+        onboarding, profile synthesis, curriculum design, lesson generation, code review,
+        adaptation directives, and capstone project ideation.
+
+        After every topic, watsonx analyzes your performance and re-shapes the next lesson's
+        depth, examples, and tone. The pattern detection sidebar (visible after your first topic)
+        shows you what EduBob has learned about you in real time.
+        """)
 
 elif not st.session_state.curriculum:
     # Profile exists but curriculum not generated yet

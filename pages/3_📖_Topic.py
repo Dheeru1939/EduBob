@@ -14,7 +14,7 @@ from core.state import (
     record_performance,
     get_adaptation_directive
 )
-from core.watsonx_client import generate, generate_json
+from core.watsonx_client import generate, generate_json, generate_stream
 from core.prompts import (
     build_topic_content_prompt,
     build_code_feedback_prompt,
@@ -63,13 +63,28 @@ if not current_topic:
 # Page header
 st.title(f"📖 Topic {current_topic_id}: {current_topic['title']}")
 st.markdown(current_topic['summary'])
+
+# Flow breadcrumb (Lesson -> Quiz -> Challenge)
+quiz_done = st.session_state.get(f'quiz_submitted_{current_topic_id}', False)
+challenge_done = current_topic_id in st.session_state.completed_topics
+
+lesson_class = "done" if quiz_done else "active"
+quiz_class = "done" if quiz_done else ("active" if not challenge_done else "done")
+chal_class = "done" if challenge_done else "active" if quiz_done else ""
+
+st.markdown(f"""
+<div class='flow-breadcrumb'>
+    <div class='flow-step {lesson_class}'>📚 1. Lesson</div>
+    <div class='flow-step {quiz_class}'>❓ 2. Quiz</div>
+    <div class='flow-step {chal_class}'>💻 3. Challenge</div>
+</div>
+""", unsafe_allow_html=True)
 st.markdown("---")
 
 # Generate topic content if not cached
 if current_topic_id not in st.session_state.topic_contents:
-    st.info("✨ Generating personalized content for this topic...")
-    
-    with st.spinner("🤖 Watsonx is preparing your lesson, quiz, and challenge..."):
+    with st.status("🤖 Watsonx is preparing your topic...", expanded=True) as gen_status:
+        st.write("📋 Loading your profile and adaptation history...")
         # Forced directive (set when user requests a regeneration after failing) takes precedence
         forced_directive = st.session_state.get(f'forced_directive_{current_topic_id}')
         if forced_directive:
@@ -79,6 +94,8 @@ if current_topic_id not in st.session_state.topic_contents:
         else:
             adaptation_directive = get_adaptation_directive(current_topic_id)
 
+        st.write("✨ Tailoring this topic to your specific profile...")
+
         # Build prompt
         prompt = build_topic_content_prompt(
             topic_spec=current_topic,
@@ -86,8 +103,9 @@ if current_topic_id not in st.session_state.topic_contents:
             adaptation_directive=adaptation_directive
         )
 
+        st.write("📚 Generating lesson, quiz, and code challenge...")
+
         # Call watsonx.ai with retry + schema validation
-        # max_tokens 1000 — lesson 200-400 words + 3 quiz Qs + challenge fits in ~700-900 tokens
         content = generate_json(
             prompt=prompt,
             system="You are an expert Python educator creating engaging, personalized learning content.",
@@ -105,11 +123,11 @@ if current_topic_id not in st.session_state.topic_contents:
 
         if content:
             st.session_state.topic_contents[current_topic_id] = content
-            st.success("✅ Content generated!")
-            time.sleep(1)
+            gen_status.update(label="✅ Topic ready!", state="complete", expanded=False)
+            time.sleep(0.6)
             st.rerun()
         else:
-            st.error("⚠️ Could not generate content. Please try again.")
+            gen_status.update(label="⚠️ Could not generate content", state="error")
             if st.button("Retry"):
                 st.rerun()
             st.stop()
@@ -394,17 +412,23 @@ with tab1:
             with st.chat_message("user"):
                 st.markdown(user_question)
             with st.chat_message("assistant"):
-                with st.spinner("Watsonx is thinking..."):
-                    chat_prompt = build_topic_chat_prompt(
-                        topic_title=current_topic['title'],
-                        lesson_markdown=topic_content.get('lesson_markdown', ''),
-                        profile=st.session_state.profile,
-                        chat_history=chat_history[:-1],
-                        user_question=user_question,
+                chat_prompt = build_topic_chat_prompt(
+                    topic_title=current_topic['title'],
+                    lesson_markdown=topic_content.get('lesson_markdown', ''),
+                    profile=st.session_state.profile,
+                    chat_history=chat_history[:-1],
+                    user_question=user_question,
+                )
+                # Stream the response — appears character by character
+                try:
+                    answer = st.write_stream(
+                        generate_stream(prompt=chat_prompt, max_tokens=350, temperature=0.5)
                     )
+                except Exception:
                     answer = generate(prompt=chat_prompt, max_tokens=350, temperature=0.5)
-                    if not answer or answer == "{}":
-                        answer = "Hmm, I'm having trouble responding right now. Try rephrasing, or check the AI Activity Log in the sidebar."
+                    st.markdown(answer)
+                if not answer or answer == "{}":
+                    answer = "Hmm, I'm having trouble responding right now. Try rephrasing, or check the AI Activity Log in the sidebar."
                     st.markdown(answer)
             chat_history.append({"role": "assistant", "content": answer})
             st.session_state[chat_key] = chat_history
@@ -711,7 +735,17 @@ with tab3:
                     }
                     
                     record_performance(performance_record)
-                    
+
+                    # ---- Achievement toasts ----
+                    if score == 100:
+                        st.toast("🌟 Perfect score!", icon="🌟")
+                    if st.session_state.get(f'quiz_score_{current_topic_id}', 0) == len(quiz):
+                        st.toast("✅ Aced the quiz too!", icon="✅")
+                    if len(st.session_state.completed_topics) == 1:
+                        st.toast("🎉 First topic conquered!", icon="🎉")
+                    elif len(st.session_state.completed_topics) == len(topics):
+                        st.toast("🎓 Every topic done — capstone time!", icon="🎓")
+
                     # Compute adaptation for next topic if not last
                     if current_topic_id < 5:
                         next_topic_id = current_topic_id + 1
