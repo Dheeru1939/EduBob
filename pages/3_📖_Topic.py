@@ -301,9 +301,14 @@ with tab1:
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("Take Quiz →", type="primary", use_container_width=True):
-            st.session_state.active_tab = "quiz"
-            st.info("Switch to the Quiz tab above ☝️")
+        if st.button("Take Quiz →", type="primary", use_container_width=True, key=f"goto_quiz_{current_topic_id}"):
+            # Auto-switch to the Quiz tab via JS (Streamlit tabs don't support programmatic switch natively)
+            components.html("""
+            <script>
+                const tabs = window.parent.document.querySelectorAll('button[role="tab"]');
+                if (tabs.length > 1) tabs[1].click();
+            </script>
+            """, height=0)
 
 # ============================================================================
 # TAB 2: QUIZ
@@ -370,8 +375,14 @@ with tab2:
         
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("Continue to Challenge →", type="primary", use_container_width=True):
-                st.info("Switch to the Challenge tab above ☝️")
+            if st.button("Continue to Challenge →", type="primary", use_container_width=True, key=f"goto_challenge_{current_topic_id}"):
+                # Auto-switch to Challenge tab (index 2)
+                components.html("""
+                <script>
+                    const tabs = window.parent.document.querySelectorAll('button[role="tab"]');
+                    if (tabs.length > 2) tabs[2].click();
+                </script>
+                """, height=0)
 
 # ============================================================================
 # TAB 3: CHALLENGE
