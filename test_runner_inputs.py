@@ -46,6 +46,16 @@ CASES = [
         "code": "def get_a(d):\n    return d['a']",
         "test_cases": [{"input": "{'a': 42, 'b': 99}", "expected": "42"}],
     },
+    {
+        "name": "LLM quote-wrapped string expected (the new bug case)",
+        "code": "def greet(name):\n    return f'Hello, {name}!'",
+        "test_cases": [{"input": "'Alice'", "expected": "'Hello, Alice!'"}],
+    },
+    {
+        "name": "LLM double-quote-wrapped string expected",
+        "code": "def greet(name):\n    return f'Hello, {name}!'",
+        "test_cases": [{"input": "'Bob'", "expected": '"Hello, Bob!"'}],
+    },
 ]
 
 

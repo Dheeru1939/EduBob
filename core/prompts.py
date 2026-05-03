@@ -196,6 +196,12 @@ CRITICAL TEST CASE RULES (must follow precisely):
    - Two strings: `"'a', 'b'"` or `"('a', 'b')"`
    - Number list: `"[1, 2, 3]"`
    - Two ints: `"5, 10"`
+8. Test case `expected` format: the EXACT value the function returns, with NO outer wrapping quotes. The runner compares str(actual) to str(expected).
+   - WRONG (do NOT do this): `"expected": "'Hello, Alice!'"` — this puts literal quote characters in the expected string.
+   - RIGHT: `"expected": "Hello, Alice!"` — just the string itself.
+   - For numbers: `"expected": "15"` or `"expected": 15` (both work).
+   - For lists: `"expected": "[1, 2, 3]"` (the str() representation of the list).
+   - For dicts: `"expected": "{'a': 1}"` (the str() representation).
 
 Topic specification:
 {topic_spec}

@@ -120,10 +120,27 @@ def _execute_in_process(code: str, test_cases: List[Dict], result_queue: multipr
 
                 # Call the student's function
                 actual_result = student_func(*args)
-                
+
                 # Convert result to string for comparison
                 actual_str = str(actual_result)
-                expected_str = str(test_case.get("expected", ""))
+
+                # Normalize the expected value. The LLM sometimes wraps string
+                # results in literal quotes (e.g. "'Hello, Alice!'") -- treat
+                # that as a Python literal and unwrap before comparing.
+                expected_raw = test_case.get("expected", "")
+                if isinstance(expected_raw, str):
+                    s = expected_raw.strip()
+                    if len(s) >= 2 and (
+                        (s.startswith("'") and s.endswith("'"))
+                        or (s.startswith('"') and s.endswith('"'))
+                    ):
+                        try:
+                            unwrapped = eval(s, {"__builtins__": safe_builtins})
+                            if isinstance(unwrapped, str):
+                                expected_raw = unwrapped
+                        except Exception:
+                            pass
+                expected_str = str(expected_raw)
                 
                 test_result["actual"] = actual_str
                 
