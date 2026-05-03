@@ -90,21 +90,34 @@ def _execute_in_process(code: str, test_cases: List[Dict], result_queue: multipr
             }
             
             try:
-                # Evaluate the input expression to get actual arguments
-                # Input format: "'World'" or "5, 10" etc.
-                input_expr = test_case.get("input", "")
-                
-                # Create a safe eval namespace
+                # Evaluate the input expression to get actual arguments.
+                # Input format examples (all should work):
+                #   "'World'"               -> single string arg
+                #   "5, 10"                 -> two int args
+                #   "'a', 'b'"              -> two string args
+                #   "('example', 'about')"  -> tuple of two args (LLM sometimes wraps in parens)
+                #   "[1, 2, 3]"             -> single list arg
+                #   "{'a': 1}"              -> single dict arg
+                input_expr = test_case.get("input", "").strip()
                 eval_namespace = {'__builtins__': safe_builtins}
-                
-                # Parse input - could be single arg or multiple args
-                if ',' in input_expr:
-                    # Multiple arguments
-                    args = eval(f"({input_expr},)", eval_namespace)
+
+                if not input_expr:
+                    args = ()
                 else:
-                    # Single argument
-                    args = (eval(input_expr, eval_namespace),)
-                
+                    # Wrap once in parens so we can normalize. This handles:
+                    # - Single value: ("5") -> 5 (not a tuple) -> args = (5,)
+                    # - CSV: ("5, 10") -> (5, 10) tuple -> args = (5, 10)
+                    # - Already-paren'd: (("5, 10")) -> (5, 10) -> args = (5, 10)
+                    try:
+                        evaluated = eval(f"({input_expr})", eval_namespace)
+                    except Exception:
+                        evaluated = eval(input_expr, eval_namespace)
+
+                    if isinstance(evaluated, tuple):
+                        args = evaluated
+                    else:
+                        args = (evaluated,)
+
                 # Call the student's function
                 actual_result = student_func(*args)
                 
