@@ -30,19 +30,25 @@ if 'current_question' not in st.session_state:
 if 'onboarding_complete' not in st.session_state:
     st.session_state.onboarding_complete = False
 
-# Progress indicator
-total_questions = 4
+# Progress indicator — dynamic question count (AI decides between MIN and MAX)
+MIN_QUESTIONS = 3
+MAX_QUESTIONS = 6
 current_count = len(st.session_state.onboarding_qa)
 
-if current_count < total_questions:
-    st.progress(current_count / total_questions)
-    st.caption(f"Question {current_count + 1} of {total_questions}")
+if not st.session_state.onboarding_complete:
+    # Visual progress: how close we are to the minimum at minimum, but show cap as the upper bound
+    progress_pct = min(1.0, current_count / MAX_QUESTIONS)
+    st.progress(progress_pct)
+    if current_count < MIN_QUESTIONS:
+        st.caption(f"Question {current_count + 1} (Watsonx asks 3–6 questions, depending on your answers)")
+    else:
+        st.caption(f"Question {current_count + 1} of up to {MAX_QUESTIONS} — Watsonx may stop early when it has enough")
 else:
     st.progress(1.0)
     st.caption("Analyzing your profile...")
 
-# Generate next question if needed
-if not st.session_state.current_question and current_count < total_questions:
+# Generate next question if needed (until cap reached or AI signals done)
+if not st.session_state.current_question and current_count < MAX_QUESTIONS and not st.session_state.onboarding_complete:
     with st.spinner("Watsonx is crafting your next question..."):
         # Build prompt for next question
         prompt = build_onboarding_next_question_prompt(st.session_state.onboarding_qa)
@@ -61,8 +67,8 @@ if not st.session_state.current_question and current_count < total_questions:
         if question_data and "question" in question_data:
             st.session_state.current_question = question_data
         else:
-            # Fallback questions — vary per index so we never repeat
-            # Designed to capture: age, life context + field, motivation, learning style
+            # Fallback questions — covers all dimensions if AI fails
+            # Final fallback always sets is_final at MIN_QUESTIONS or MAX_QUESTIONS
             fallback_questions = [
                 {
                     "question": "Roughly which age range fits you best?",
@@ -85,6 +91,16 @@ if not st.session_state.current_question and current_count < total_questions:
                     "is_final": False
                 },
                 {
+                    "question": "What field do you spend most of your time in?",
+                    "options": [
+                        "Marketing / Sales / Communications",
+                        "Finance / Accounting / Operations",
+                        "Healthcare / Education / Public Service",
+                        "Engineering / Design / Tech / Other"
+                    ],
+                    "is_final": False
+                },
+                {
                     "question": "What do you most want to do with Python?",
                     "options": [
                         "Build websites or web tools",
@@ -102,13 +118,27 @@ if not st.session_state.current_question and current_count < total_questions:
                         "Project-based — build first, learn as I go",
                         "Mix of all three"
                     ],
+                    # Mark final at MIN_QUESTIONS so we don't drag past 5 with fallbacks
+                    "is_final": True
+                },
+                {
+                    "question": "Anything else important about how you want to learn?",
+                    "options": [
+                        "I want it to be fun and casual",
+                        "I want depth and challenge",
+                        "I want short, daily-sized lessons",
+                        "I want a steady, focused pace"
+                    ],
                     "is_final": True
                 }
             ]
-            st.session_state.current_question = fallback_questions[min(current_count, 3)]
+            st.session_state.current_question = fallback_questions[min(current_count, len(fallback_questions) - 1)]
+            # Force is_final at the cap regardless of fallback content
+            if current_count >= MAX_QUESTIONS - 1:
+                st.session_state.current_question["is_final"] = True
 
 # Display current question
-if st.session_state.current_question and current_count < total_questions:
+if st.session_state.current_question and not st.session_state.onboarding_complete:
     question = st.session_state.current_question
     
     st.markdown("---")
@@ -134,11 +164,18 @@ if st.session_state.current_question and current_count < total_questions:
         
         # Clear current question to trigger next generation
         st.session_state.current_question = None
-        
-        # Check if this was the final question
-        if question.get('is_final', False) or len(st.session_state.onboarding_qa) >= total_questions:
+
+        # Stop conditions:
+        # - AI flagged is_final AND we've met the minimum question count
+        # - Hard cap of MAX_QUESTIONS reached regardless of is_final
+        new_count = len(st.session_state.onboarding_qa)
+        ai_says_done = question.get('is_final', False)
+        hit_minimum = new_count >= MIN_QUESTIONS
+        hit_cap = new_count >= MAX_QUESTIONS
+
+        if hit_cap or (ai_says_done and hit_minimum):
             st.session_state.onboarding_complete = True
-        
+
         st.rerun()
 
 # Generate interest profile when onboarding is complete
